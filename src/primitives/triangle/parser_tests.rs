@@ -4,7 +4,7 @@ use super::{parser::parse_triangle_indices, TriangleIndex};
 
 #[test]
 fn single_triangle_face_test() {
-    let input = "usemtl A\nf 1/1/1 2/1/0 3/1/1";
+    let input = "usemtl A\nf 1/1/1 2/1/1 3/1/1";
     let map = vec![("A".to_string(), 0)]
         .into_iter()
         .collect::<HashMap<String, usize>>();
@@ -16,7 +16,7 @@ fn single_triangle_face_test() {
 
 #[test]
 fn multiple_triangle_face_test() {
-    let input = "usemtl A\nf 1/1/1 2/1/0 3/1/1\nf 1/1/1 2/1/1 3/1/1";
+    let input = "usemtl A\nf 1/1/1 2/1/1 3/1/1\nf 1/1/1 2/1/1 3/1/1";
     let map = vec![("A".to_string(), 0)]
         .into_iter()
         .collect::<HashMap<String, usize>>();
