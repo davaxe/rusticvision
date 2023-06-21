@@ -1,8 +1,5 @@
 pub mod parser;
 
-#[cfg(test)]
-mod parser_tests;
-
 use glam::Vec3;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -51,3 +48,6 @@ impl Default for Material {
         )
     }
 }
+
+#[cfg(test)]
+mod parser_tests;

@@ -1,9 +1,7 @@
-pub mod parser;
-
-use std::fmt::Debug;
-
 use crate::primitives::{TriangleMesh, TriangleIndex};
 
+/// Struct representing an object in the scene. An object is essentially a collections
+/// of triangles.
 pub struct Object<'global> {
     pub identifier: String,
     pub triangles: Vec<TriangleIndex>,

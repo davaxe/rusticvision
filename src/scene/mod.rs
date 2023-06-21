@@ -1,8 +1,6 @@
 pub mod camera;
-pub mod obj_parser;
 pub mod object;
-
-use std::collections::HashMap;
+pub mod parser;
 
 use crate::primitives::TriangleMesh;
 
@@ -16,15 +14,16 @@ pub struct Scene<'this> {
 }
 
 impl<'this> Scene<'this> {
-    pub fn new(triangle_mesh: &'this TriangleMesh, obj_map: &HashMap<String, String>, mat_map: &HashMap<String, usize>) -> Self {
-        let objects = obj_parser::get_objects(triangle_mesh, obj_map, mat_map);
+    pub fn with_default_camera(
+        triangle_mesh: &'this TriangleMesh,
+        objects: Vec<Object<'this>>,
+    ) -> Self {
         let camera = Camera::default();
         Self {
             objects,
             camera,
             triangle_mesh,
         }
-
     }
 
     pub fn debug_print_objects(&self) {

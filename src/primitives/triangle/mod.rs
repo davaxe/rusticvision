@@ -1,3 +1,5 @@
+pub mod parser;
+
 use super::{material::Material, Normal, Position};
 
 /// Single indices of a triangle.
@@ -116,17 +118,17 @@ impl Default for TriangleIndex {
 
 /// Struct of all data needed to define a triangle. This includes the vertices,
 /// the normal and the material. Data is stored as references.
-pub struct Triangle<'global> {
-    vertices: (&'global Position, &'global Position, &'global Position),
-    normal: &'global Normal,
-    material: &'global Material,
+pub struct Triangle<'mesh> {
+    vertices: (&'mesh Position, &'mesh Position, &'mesh Position),
+    normal: &'mesh Normal,
+    material: &'mesh Material,
 }
 
-impl<'global> Triangle<'global> {
+impl<'mesh> Triangle<'mesh> {
     pub fn new(
-        vertices: (&'global Position, &'global Position, &'global Position),
-        normal: &'global Normal,
-        material: &'global Material,
+        vertices: (&'mesh Position, &'mesh Position, &'mesh Position),
+        normal: &'mesh Normal,
+        material: &'mesh Material,
     ) -> Self {
         Self {
             vertices,
@@ -135,3 +137,6 @@ impl<'global> Triangle<'global> {
         }
     }
 }
+
+#[cfg(test)]
+mod parser_tests;

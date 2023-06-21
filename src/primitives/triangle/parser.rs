@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::primitives::TriangleIndex;
+use super::TriangleIndex;
 
 use nom::{
     self,
@@ -15,6 +15,15 @@ use nom::{
     IResult, Parser,
 };
 
+/// Parse all triangle indices from list of triangle faces (from obj file).
+///
+/// ### Arguments
+/// - `input` - The input string, ie. all triangle faces.
+/// - `material_map` - The material map maps the material name to the index of
+/// the material in the triangle mesh.
+///
+/// ### Returns
+/// A tuple containing the remaining input and the vector of triangle indices.
 pub fn parse_triangle_indices<'a>(
     input: &'a str,
     material_map: &'a HashMap<String, usize>,
