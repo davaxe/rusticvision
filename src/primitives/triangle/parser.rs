@@ -1,7 +1,5 @@
 use std::collections::HashMap;
 
-use crate::primitives::{triangle, Material};
-
 use super::TriangleIndex;
 
 use nom::{

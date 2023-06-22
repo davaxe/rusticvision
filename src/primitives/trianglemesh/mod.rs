@@ -1,5 +1,6 @@
-use super::material::Material;
-use super::{Normal, Position, TexCoord, Triangle, TriangleIndex};
+use crate::{material::Material, traits::Intersectable};
+
+use super::{Hit, Normal, Position, Ray, TexCoord, Triangle, TriangleIndex};
 
 pub mod parser;
 
@@ -43,6 +44,11 @@ impl TriangleMesh {
         &self.materials
     }
 
+    /// Get material from material index.
+    pub fn get_material(&self, material_index: usize) -> Option<&Material> {
+        self.materials.get(material_index)
+    }
+
     /// Get triangle from triangle index.
     ///
     /// ### Arguments
@@ -55,7 +61,7 @@ impl TriangleMesh {
     /// ### Panics
     /// Panics if any of the indices in the `TriangleIndex` are out of invalid.
     pub fn get_triangle(&self, triangle_index: &TriangleIndex) -> Triangle {
-        let (v1, v2, v3, n, m) = triangle_index.indices();
+        let (v1, v2, v3, n, _) = triangle_index.indices();
         Triangle::new(
             (
                 self.vertex_positions.get(v1).expect("Invalid vertex index"),
@@ -65,8 +71,32 @@ impl TriangleMesh {
             self.triangle_normals
                 .get(n)
                 .expect("Invalid triangle index"),
-            self.materials.get(m).expect("Invalid triangle index"),
+            triangle_index.material_index(),
         )
+    }
+
+    /// Test if the given ray intersects the given triangle in the mesh.
+    ///
+    /// ### Arguments
+    /// - `ray` - The ray to test intersection with.
+    /// - `triangle_index` - The triangle index of the triangle to test
+    /// - `t_min` - The minimum distance along the ray to test for intersection.
+    /// - `t_max` - The maximum distance along the ray to test for intersection.
+    ///
+    /// ### Returns
+    /// `Some(Hit)` if the ray intersects the triangle, `None` otherwise.
+    ///
+    /// ### Panics
+    /// Panics if any of the indices in the `TriangleIndex` are invalid.
+    pub fn intersect_triangle(
+        &self,
+        ray: &Ray,
+        triangle_index: &TriangleIndex,
+        t_min: f32,
+        t_max: f32,
+    ) -> Option<Hit> {
+        let triangle = self.get_triangle(triangle_index);
+        triangle.intersect(ray, t_min, t_max)
     }
 }
 

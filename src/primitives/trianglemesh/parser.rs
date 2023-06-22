@@ -2,7 +2,7 @@ use crate::primitives::Position;
 
 use super::{Normal, TexCoord};
 
-use glam::{Vec2, Vec3};
+use glam::{Vec2, Vec3, Mat3};
 
 use nom::{
     self,
@@ -62,7 +62,8 @@ pub fn parse_vertex_data(
 fn parse_vertex_position(input: &str) -> IResult<&str, VertexParseResult> {
     let (input, _) = tag("v ")(input)?;
     let (input, a) = separated_list1(space1, float)(input)?;
-    Ok((input, VertexParseResult::Position(Vec3::from_slice(&a))))
+    let pos = Vec3::from_slice(&a);
+    Ok((input, VertexParseResult::Position(pos)))
 }
 
 /// Parses a single normal vector with format: `vn x y z`. The x, y and z values
@@ -70,10 +71,11 @@ fn parse_vertex_position(input: &str) -> IResult<&str, VertexParseResult> {
 fn parse_vertex_normal(input: &str) -> IResult<&str, VertexParseResult> {
     let (input, _) = tag("vn ")(input)?;
     let (input, a) = separated_list1(space1, float)(input)?;
+    let pos = Vec3::from_slice(&a).normalize();
     Ok((
         input,
-        VertexParseResult::Normal(Vec3::from_slice(&a).normalize()),
-    ))
+        VertexParseResult::Normal(pos))
+    )
 }
 
 /// Parses a single texture coordinate. Format: `vt x y`. The x and y values are

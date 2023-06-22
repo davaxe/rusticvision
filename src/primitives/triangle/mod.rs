@@ -1,6 +1,10 @@
 pub mod parser;
 
-use super::{material::Material, Normal, Position};
+use crate::{material::Material, traits::Intersectable};
+
+use super::{Hit, Normal, Position, Ray};
+
+use glam::Vec3;
 
 /// Single indices of a triangle.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -21,6 +25,7 @@ impl TriangleIndex {
     ///
     /// ### Return value
     /// The newly created triangle.
+    #[inline]
     pub fn new(
         vertex_indices: (usize, usize, usize),
         normal_index: usize,
@@ -37,16 +42,19 @@ impl TriangleIndex {
     ///
     /// ### Return value
     /// (v1, v2, v3)
+    #[inline]
     pub fn vertex_indices(&self) -> (usize, usize, usize) {
         self.vertex_indices
     }
 
     /// Returns the material index of the triangle.
+    #[inline]
     pub fn material_index(&self) -> usize {
         self.material_index
     }
 
     /// Returns the normal index of the triangle.
+    #[inline]
     pub fn normal_index(&self) -> usize {
         self.normal_index
     }
@@ -56,6 +64,7 @@ impl TriangleIndex {
     ///
     /// ### Return value
     /// (v1, v2, v3, n, m)
+    #[inline]
     pub fn indices(&self) -> (usize, usize, usize, usize, usize) {
         (
             self.vertex_indices.0,
@@ -119,22 +128,91 @@ impl Default for TriangleIndex {
 /// Struct of all data needed to define a triangle. This includes the vertices,
 /// the normal and the material. Data is stored as references.
 pub struct Triangle<'mesh> {
-    vertices: (&'mesh Position, &'mesh Position, &'mesh Position),
-    normal: &'mesh Normal,
-    material: &'mesh Material,
+    pub vertex_positions: (&'mesh Position, &'mesh Position, &'mesh Position),
+    pub normal: &'mesh Normal,
+    pub material_index: usize,
 }
 
 impl<'mesh> Triangle<'mesh> {
+    #[inline]
     pub fn new(
-        vertices: (&'mesh Position, &'mesh Position, &'mesh Position),
+        vertex_positions: (&'mesh Position, &'mesh Position, &'mesh Position),
         normal: &'mesh Normal,
-        material: &'mesh Material,
+        material_index: usize,
     ) -> Self {
         Self {
-            vertices,
+            vertex_positions,
             normal,
-            material,
+            material_index,
         }
+    }
+
+    /// Returns the minimum vertex positions of the triangle. This is useful
+    /// for bounding box calculations.
+    #[inline]
+    pub fn min(&self) -> Vec3 {
+        let (&v0, &v1, &v2) = self.vertex_positions;
+        v0.min(v1).min(v2)
+    }
+
+    /// Returns the maximum vertex positions of the triangle. This is useful
+    /// for bounding box calculations.
+    #[inline]
+    pub fn max(&self) -> Vec3 {
+        let (&v0, &v1, &v2) = self.vertex_positions;
+        v0.max(v1).max(v2)
+    }
+}
+
+impl<'mesh> Intersectable for Triangle<'mesh> {
+    /// Intersects a ray with the triangle. [Möller–Trumbore
+    /// intersection](https://www.scratchapixel.com/lessons/3d-basic-rendering/ray-tracing-rendering-a-triangle/ray-triangle-intersection-geometric-solution.html)
+    ///
+    /// ### Arguments
+    /// - `ray` - The ray to intersect with.
+    /// - `t_min` - The minimum distance to consider.
+    /// - `t_max` - The maximum distance to consider.
+    ///
+    /// ### Return value
+    /// The hit data if the ray intersects with the triangle, `None` otherwise.
+    fn intersect(&self, ray: &Ray, t_min: f32, t_max: f32) -> Option<Hit> {
+        let (&v0, &v1, &v2) = self.vertex_positions;
+        let edge0 = v1 - v0;
+        let edge1 = v2 - v0;
+        let h = ray.direction.cross(edge1);
+        let a = edge0.dot(h);
+
+        if a.abs() < f32::EPSILON {
+            return None;
+        }
+
+        let f = 1.0 / a;
+        let s = ray.origin - v0;
+        let u = f * s.dot(h);
+
+        if !(0.0..=1.0).contains(&u) {
+            return None;
+        }
+
+        let q = s.cross(edge0);
+        let v = f * ray.direction.dot(q);
+
+        if v < 0.0 || u + v > 1.0 {
+            return None;
+        }
+
+        let t = f * edge1.dot(q);
+
+        if t > t_min && t < t_max {
+            return Some(Hit::new(
+                ray.at(t),
+                t,
+                *ray,
+                *self.normal,
+                self.material_index,
+            ));
+        }
+        None
     }
 }
 

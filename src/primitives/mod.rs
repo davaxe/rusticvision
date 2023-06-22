@@ -1,10 +1,12 @@
 pub mod triangle;
 pub mod trianglemesh;
-pub mod material;
+pub mod ray;
+pub mod aabb;
 
+pub use aabb::BoundingBox;
 pub use trianglemesh::TriangleMesh;
+pub use ray::{Ray, Hit};
 pub use triangle::{Triangle, TriangleIndex};
-pub use material::Material;
 
 /// Position in 3D space.
 type Position = glam::Vec3;

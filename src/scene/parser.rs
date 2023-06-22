@@ -1,11 +1,11 @@
 use std::collections::HashMap;
 
 use crate::primitives::{
-    material,
     triangle,
     trianglemesh::{self, TriangleMesh},
 };
-use crate::scene::object::Object;
+
+use crate::{material, scene::object::Object};
 
 use glam::{Vec2, Vec3};
 
