@@ -1,6 +1,6 @@
 pub mod parser;
 
-use crate::{material::Material, traits::Intersectable};
+use crate::{traits::Intersectable};
 
 use super::{Hit, Normal, Position, Ray};
 

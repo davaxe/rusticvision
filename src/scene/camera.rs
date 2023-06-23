@@ -8,7 +8,7 @@ pub struct Camera {
     view: Mat4,
     inverse_view: Mat4,
     position: Vec3,
-    direction: Vec3,
+    target: Vec3,
     z_near: f32,
     z_far: f32,
     vertical_fov: f32,
@@ -18,9 +18,10 @@ pub struct Camera {
 }
 
 impl Camera {
+    #[inline]
     fn new(
         position: Vec3,
-        direction: Vec3,
+        target: Vec3,
         z_near: f32,
         z_far: f32,
         vertical_fov: f32,
@@ -28,9 +29,10 @@ impl Camera {
         height: u32,
     ) -> Self {
         let aspect_ratio = width as f32 / height as f32;
-        let projection = Mat4::perspective_rh(vertical_fov.to_radians(), aspect_ratio, z_near, z_far);
+        let projection =
+            Mat4::perspective_rh(vertical_fov.to_radians(), aspect_ratio, z_near, z_far);
         let inverse_projection = projection.inverse();
-        let view = Mat4::look_at_rh(position, position + direction, Vec3::Y);
+        let view = Mat4::look_at_rh(position, target, Vec3::Y);
         let inverse_view = view.inverse();
         Self {
             projection,
@@ -38,7 +40,7 @@ impl Camera {
             view,
             inverse_view,
             position,
-            direction,
+            target,
             z_near,
             z_far,
             vertical_fov,
@@ -58,11 +60,14 @@ impl Camera {
         rays
     }
 
+    /// Get the dimension of image produced by this camera.
     #[inline]
     pub fn get_dimensions(&self) -> (u32, u32) {
         (self.width, self.height)
     }
 
+    /// Get a ray from the camera to the given pixel.
+    #[inline]
     pub fn get_ray(&self, x: u32, y: u32) -> Ray {
         let (x, y) = (x as f32, y as f32);
         let (width, height) = (self.width as f32, self.height as f32);
@@ -81,9 +86,10 @@ impl Default for Camera {
     }
 }
 
+#[derive(Clone, Debug)]
 pub struct CameraBuilder {
     position: Option<Vec3>,
-    direction: Option<Vec3>,
+    target: Option<Vec3>,
     z_near: Option<f32>,
     z_far: Option<f32>,
     vertical_fov: Option<f32>,
@@ -95,7 +101,7 @@ impl CameraBuilder {
     pub fn new() -> Self {
         Self {
             position: None,
-            direction: None,
+            target: None,
             z_near: None,
             z_far: None,
             vertical_fov: None,
@@ -104,58 +110,67 @@ impl CameraBuilder {
         }
     }
 
+    /// The position of the camera. Defaults to (0, 0, 0)
+    #[inline]
     pub fn with_position(mut self, position: Vec3) -> Self {
         self.position = Some(position);
         self
     }
 
-    pub fn with_direction(mut self, direction: Vec3) -> Self {
-        self.direction = Some(direction);
+    /// The point the camera is looking at. Defaults to (0, 0, 1)
+    #[inline]
+    pub fn with_target(mut self, target: Vec3) -> Self {
+        self.target = Some(target);
         self
     }
 
+    // Near clipping plane distance. Anything closer than this will not be
+    // rendered.
+    #[inline]
     pub fn with_z_near(mut self, z_near: f32) -> Self {
         self.z_near = Some(z_near);
         self
     }
 
+    /// Far clipping plane distance. Anything beyond this will not be rendered.
+    #[inline]
     pub fn with_z_far(mut self, z_far: f32) -> Self {
         self.z_far = Some(z_far);
         self
     }
 
+    /// Image width in pixels
+    #[inline]
     pub fn with_width(mut self, width: u32) -> Self {
         self.width = Some(width);
         self
     }
 
+    /// Image height in pixels
+    #[inline]
     pub fn with_height(mut self, height: u32) -> Self {
         self.height = Some(height);
         self
     }
 
+    /// Vertical field of view in degrees
+    #[inline]
     pub fn with_vertical_fov(mut self, vertical_fov: f32) -> Self {
         self.vertical_fov = Some(vertical_fov);
         self
     }
 
+    /// Build the camera, based on the parameters set.
+    #[inline]
     pub fn build(self) -> Camera {
         let position = self.position.unwrap_or(Vec3::ZERO);
-        let direction = self.direction.unwrap_or(Vec3::Z);
+        let target = self.target.unwrap_or(Vec3::Z);
         let z_near = self.z_near.unwrap_or(0.1);
         let z_far = self.z_far.unwrap_or(100.0);
-        let vertical_fov = self.vertical_fov.unwrap_or(60.0);
+        let vertical_fov = self.vertical_fov.unwrap_or(39.6);
         let width = self.width.unwrap_or(800);
         let height = self.height.unwrap_or(600);
-        Camera::new(
-            position,
-            direction,
-            z_near,
-            z_far,
-            vertical_fov,
-            width,
-            height,
-        )
+        Camera::new(position, target, z_near, z_far, vertical_fov, width, height)
     }
 }
 

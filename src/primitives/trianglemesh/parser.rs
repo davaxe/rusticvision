@@ -2,7 +2,7 @@ use crate::primitives::Position;
 
 use super::{Normal, TexCoord};
 
-use glam::{Vec2, Vec3, Mat3};
+use glam::{Vec2, Vec3};
 
 use nom::{
     self,

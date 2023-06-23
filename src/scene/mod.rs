@@ -12,6 +12,7 @@ use crate::{
 use object::Object;
 
 pub use camera::Camera;
+pub use renderer::SceneRenderer;
 
 pub struct Scene<'this> {
     objects: Vec<Object<'this>>,

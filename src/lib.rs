@@ -1,4 +1,5 @@
-pub mod scene;
-pub mod primitives;
-pub mod material;
-pub mod traits;
+mod scene;
+mod primitives;
+mod material;
+mod traits;
+pub mod prelude;

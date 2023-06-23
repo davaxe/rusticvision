@@ -1,5 +1,5 @@
-use super::{Hit, Ray};
-use crate::traits::Intersectable;
+use super::{Ray};
+
 
 use glam::Vec3;
 
