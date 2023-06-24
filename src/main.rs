@@ -1,13 +1,16 @@
 use rusticvision::prelude::*;
 
 fn main() {
-    let tracer = RayTracer::new()
-        .directory("test")
-        .obj_file("monkey.obj")
-        .camera_position(0.0, 0.0, -5.0)
-        .resolution(800, 600)
-        .sample_count(1)
-        .recursion_depth(1);
+    {
+        let tracer = RayTracer::new()
+            .directory("test")
+            .obj_file("test_scene.obj")
+            .camera_position(7.0, 1.9, 0.0)
+            .camera_target(0.0, 1.9, 0.0)
+            .resolution(512, 512)
+            .sample_count(64)
+            .recursion_depth(6);
 
-    tracer.render_save("test.png")
+        tracer.render_save("test2.png");
+    }
 }

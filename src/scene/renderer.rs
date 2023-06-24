@@ -1,8 +1,8 @@
-use std::sync::Mutex;
+use std::sync::{atomic::AtomicU32, Mutex};
 
-use crate::traits::Intersectable;
+use crate::{primitives::Ray, traits::Intersectable};
 
-use super::{Camera, Scene};
+use super::{Camera, Hit, Scene};
 
 use glam::Vec3;
 use image::RgbImage;
@@ -27,11 +27,13 @@ impl<'scene> SceneRenderer<'scene> {
         }
     }
 
+    /// Sets the number of samples to take per pixel.
     #[inline]
     pub fn set_sample_count(&mut self, sample_count: u32) {
         self.sample_count = sample_count;
     }
 
+    /// Sets the recursion depth for the ray tracer.
     #[inline]
     pub fn set_recursion_depth(&mut self, recursion_depth: u32) {
         self.recursion_depth = recursion_depth;
@@ -53,14 +55,28 @@ impl<'scene> SceneRenderer<'scene> {
 
     #[inline]
     fn render_pixel(&self, x: u32, y: u32) -> Vec3 {
-        let ray = self.camera.get_ray(x, y);
-        match self.scene.intersect(&ray, 0.001, 100.0) {
-            Some(hit) => {
-                let _material = self.scene.get_material(hit.material_index).unwrap();
-                hit.normal
-            }
-            None => Vec3::new(0.0, 0.0, 0.0),
+        (0..self.sample_count)
+            .map(|_| self.trace(&self.camera.get_jittered_ray(x, y), 0, Vec3::ONE))
+            .sum::<Vec3>()
+            / self.sample_count as f32
+    }
+
+    fn trace(&self, ray: &Ray, depth: u32, throughput: Vec3) -> Vec3 {
+        if depth > self.recursion_depth {
+            return Vec3::ZERO;
         }
+
+        let mesh = self.scene.triangle_mesh();
+        let mut throughput: Vec3 = throughput;
+        let mut color = Vec3::ZERO;
+
+        if let Some(hit) = self.scene.intersect(ray, 0.01, 100.0) {
+            let material = hit.material(mesh);
+            color += material.emissive_color * throughput * 5.0;
+            throughput *= material.diffuse_color;
+            color += self.trace(&hit.random_outgoing_ray(mesh), depth + 1, throughput);
+        }
+        color
     }
 
     #[inline]

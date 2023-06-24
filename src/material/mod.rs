@@ -33,6 +33,9 @@ impl Material {
             index_of_refraction,
         }
     }
+
+    
+
 }
 
 impl Default for Material {

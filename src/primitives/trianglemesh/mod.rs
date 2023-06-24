@@ -30,16 +30,19 @@ impl TriangleMesh {
     }
 
     /// Get reference to the vertex positions.
+    #[inline]
     pub fn vertex_positions(&self) -> &Vec<Position> {
         &self.vertex_positions
     }
 
     /// Get reference to the triangle normals.
+    #[inline]
     pub fn triangle_normals(&self) -> &Vec<Normal> {
         &self.triangle_normals
     }
 
     /// Get reference to the materials.
+    #[inline]
     pub fn materials(&self) -> &Vec<Material> {
         &self.materials
     }
@@ -71,7 +74,7 @@ impl TriangleMesh {
             self.triangle_normals
                 .get(n)
                 .expect("Invalid triangle index"),
-            triangle_index.material_index(),
+            *triangle_index,
         )
     }
 

@@ -1,6 +1,6 @@
 pub mod parser;
 
-use crate::{traits::Intersectable};
+use crate::traits::Intersectable;
 
 use super::{Hit, Normal, Position, Ray};
 
@@ -130,7 +130,7 @@ impl Default for TriangleIndex {
 pub struct Triangle<'mesh> {
     pub vertex_positions: (&'mesh Position, &'mesh Position, &'mesh Position),
     pub normal: &'mesh Normal,
-    pub material_index: usize,
+    pub triangle_index: TriangleIndex,
 }
 
 impl<'mesh> Triangle<'mesh> {
@@ -138,12 +138,12 @@ impl<'mesh> Triangle<'mesh> {
     pub fn new(
         vertex_positions: (&'mesh Position, &'mesh Position, &'mesh Position),
         normal: &'mesh Normal,
-        material_index: usize,
+        triangle_index: TriangleIndex,
     ) -> Self {
         Self {
             vertex_positions,
             normal,
-            material_index,
+            triangle_index,
         }
     }
 
@@ -208,8 +208,7 @@ impl<'mesh> Intersectable for Triangle<'mesh> {
                 ray.at(t),
                 t,
                 *ray,
-                *self.normal,
-                self.material_index,
+                self.triangle_index
             ));
         }
         None

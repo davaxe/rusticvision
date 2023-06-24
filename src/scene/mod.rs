@@ -20,6 +20,7 @@ pub struct Scene<'this> {
 }
 
 impl<'this> Scene<'this> {
+    #[inline]
     pub fn new(triangle_mesh: &'this TriangleMesh, objects: Vec<Object<'this>>) -> Self {
         Self {
             objects,
@@ -27,18 +28,15 @@ impl<'this> Scene<'this> {
         }
     }
 
+    #[inline]
     pub fn get_material(&self, material_index: usize) -> Option<&Material> {
         self.triangle_mesh.get_material(material_index)
     }
 
-    pub fn debug_print_objects(&self) {
-        for object in &self.objects {
-            println!("Object: {}", object.identifier);
-            for triangle in &object.triangles {
-                println!("\tTriangle: {:?}", triangle);
-            }
-            println!();
-        }
+    /// Get reference to the triangle mesh.
+    #[inline]
+    pub fn triangle_mesh(&self) -> &'this TriangleMesh {
+        self.triangle_mesh
     }
 }
 

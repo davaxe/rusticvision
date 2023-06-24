@@ -1,10 +1,7 @@
+use crate::scene::{self, camera::CameraBuilder, Camera, Scene, SceneRenderer};
+
 use glam::Vec3;
 use image::RgbImage;
-
-use crate::{
-    primitives::TriangleMesh,
-    scene::{self, camera::CameraBuilder, Camera, Scene, SceneRenderer},
-};
 
 pub struct RayTracer {
     camera_builder: CameraBuilder,

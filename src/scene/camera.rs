@@ -50,6 +50,7 @@ impl Camera {
         }
     }
 
+    /// Get all rays from the camera.
     pub fn get_camera_rays(&self) -> Vec<Ray> {
         let mut rays = Vec::with_capacity((self.width * self.height) as usize);
         for x in 0..=self.width {
@@ -78,6 +79,21 @@ impl Camera {
         let ray_dir = (self.inverse_view * Vec4::new(target.x, target.y, target.z, 0.0)).xyz();
         Ray::new(self.position, ray_dir)
     }
+
+    #[inline]
+    pub fn get_jittered_ray(&self, x: u32, y: u32) -> Ray {
+        let (x, y) = (x as f32, y as f32);
+        let (width, height) = (self.width as f32, self.height as f32);
+        let jitter = Vec2::new(rand::random::<f32>() - 0.5, rand::random::<f32>() - 0.5);
+        let (x, y) = (x + jitter.x, y + jitter.y);
+        let coord = Vec2::new(x / width, y / height);
+        let coord = coord * 2.0 - Vec2::ONE;
+        let target = self.inverse_projection * Vec4::new(coord.x, -coord.y, 1.0, 1.0);
+        let target = (target.xyz() / target.w).normalize();
+        let ray_dir = (self.inverse_view * Vec4::new(target.x, target.y, target.z, 0.0)).xyz();
+        Ray::new(self.position, ray_dir)
+    }
+
 }
 
 impl Default for Camera {
