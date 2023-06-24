@@ -4,7 +4,7 @@ use crate::{primitives::Ray, traits::Intersectable};
 
 use super::{Camera, Hit, Scene};
 
-use glam::Vec3;
+use glam::Vec3A;
 use image::RgbImage;
 use itertools::Itertools;
 use rayon::prelude::*;
@@ -54,21 +54,21 @@ impl<'scene> SceneRenderer<'scene> {
     }
 
     #[inline]
-    fn render_pixel(&self, x: u32, y: u32) -> Vec3 {
+    fn render_pixel(&self, x: u32, y: u32) -> Vec3A {
         (0..self.sample_count)
-            .map(|_| self.trace(&self.camera.get_jittered_ray(x, y), 0, Vec3::ONE))
-            .sum::<Vec3>()
+            .map(|_| self.trace(&self.camera.get_jittered_ray(x, y), 0, Vec3A::ONE))
+            .sum::<Vec3A>()
             / self.sample_count as f32
     }
 
-    fn trace(&self, ray: &Ray, depth: u32, throughput: Vec3) -> Vec3 {
+    fn trace(&self, ray: &Ray, depth: u32, throughput: Vec3A) -> Vec3A {
         if depth > self.recursion_depth {
-            return Vec3::ZERO;
+            return Vec3A::ZERO;
         }
 
         let mesh = self.scene.triangle_mesh();
-        let mut throughput: Vec3 = throughput;
-        let mut color = Vec3::ZERO;
+        let mut throughput: Vec3A = throughput;
+        let mut color = Vec3A::ZERO;
 
         if let Some(hit) = self.scene.intersect(ray, 0.01, 100.0) {
             let material = hit.material(mesh);
@@ -80,7 +80,7 @@ impl<'scene> SceneRenderer<'scene> {
     }
 
     #[inline]
-    fn vec3_to_rgb(color: Vec3) -> image::Rgb<u8> {
+    fn vec3_to_rgb(color: Vec3A) -> image::Rgb<u8> {
         let r = (color.x * 255.0) as u8;
         let g = (color.y * 255.0) as u8;
         let b = (color.z * 255.0) as u8;

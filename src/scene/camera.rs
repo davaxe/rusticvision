@@ -1,4 +1,4 @@
-use glam::{Mat4, Vec2, Vec3, Vec4, Vec4Swizzles};
+use glam::{Mat4, Vec2, Vec3A, Vec4, Vec3, Vec4Swizzles};
 
 use crate::primitives::Ray;
 
@@ -7,8 +7,8 @@ pub struct Camera {
     inverse_projection: Mat4,
     view: Mat4,
     inverse_view: Mat4,
-    position: Vec3,
-    target: Vec3,
+    position: Vec3A,
+    target: Vec3A,
     z_near: f32,
     z_far: f32,
     vertical_fov: f32,
@@ -20,8 +20,8 @@ pub struct Camera {
 impl Camera {
     #[inline]
     fn new(
-        position: Vec3,
-        target: Vec3,
+        position: Vec3A,
+        target: Vec3A,
         z_near: f32,
         z_far: f32,
         vertical_fov: f32,
@@ -32,7 +32,7 @@ impl Camera {
         let projection =
             Mat4::perspective_rh(vertical_fov.to_radians(), aspect_ratio, z_near, z_far);
         let inverse_projection = projection.inverse();
-        let view = Mat4::look_at_rh(position, target, Vec3::Y);
+        let view = Mat4::look_at_rh(position.into(), target.into(), Vec3::Y);
         let inverse_view = view.inverse();
         Self {
             projection,
@@ -77,7 +77,7 @@ impl Camera {
         let target = self.inverse_projection * Vec4::new(coord.x, -coord.y, 1.0, 1.0);
         let target = (target.xyz() / target.w).normalize();
         let ray_dir = (self.inverse_view * Vec4::new(target.x, target.y, target.z, 0.0)).xyz();
-        Ray::new(self.position, ray_dir)
+        Ray::new(self.position, ray_dir.into())
     }
 
     #[inline]
@@ -91,7 +91,7 @@ impl Camera {
         let target = self.inverse_projection * Vec4::new(coord.x, -coord.y, 1.0, 1.0);
         let target = (target.xyz() / target.w).normalize();
         let ray_dir = (self.inverse_view * Vec4::new(target.x, target.y, target.z, 0.0)).xyz();
-        Ray::new(self.position, ray_dir)
+        Ray::new(self.position, ray_dir.into())
     }
 
 }
@@ -104,8 +104,8 @@ impl Default for Camera {
 
 #[derive(Clone, Debug)]
 pub struct CameraBuilder {
-    position: Option<Vec3>,
-    target: Option<Vec3>,
+    position: Option<Vec3A>,
+    target: Option<Vec3A>,
     z_near: Option<f32>,
     z_far: Option<f32>,
     vertical_fov: Option<f32>,
@@ -128,14 +128,14 @@ impl CameraBuilder {
 
     /// The position of the camera. Defaults to (0, 0, 0)
     #[inline]
-    pub fn with_position(mut self, position: Vec3) -> Self {
+    pub fn with_position(mut self, position: Vec3A) -> Self {
         self.position = Some(position);
         self
     }
 
     /// The point the camera is looking at. Defaults to (0, 0, 1)
     #[inline]
-    pub fn with_target(mut self, target: Vec3) -> Self {
+    pub fn with_target(mut self, target: Vec3A) -> Self {
         self.target = Some(target);
         self
     }
@@ -179,8 +179,8 @@ impl CameraBuilder {
     /// Build the camera, based on the parameters set.
     #[inline]
     pub fn build(self) -> Camera {
-        let position = self.position.unwrap_or(Vec3::ZERO);
-        let target = self.target.unwrap_or(Vec3::Z);
+        let position = self.position.unwrap_or(Vec3A::ZERO);
+        let target = self.target.unwrap_or(Vec3A::Z);
         let z_near = self.z_near.unwrap_or(0.1);
         let z_far = self.z_far.unwrap_or(100.0);
         let vertical_fov = self.vertical_fov.unwrap_or(39.6);

@@ -1,17 +1,17 @@
 use super::{Ray};
 
 
-use glam::Vec3;
+use glam::Vec3A;
 
 #[derive(Debug)]
 pub struct BoundingBox {
-    min: Vec3,
-    max: Vec3,
+    min: Vec3A,
+    max: Vec3A,
 }
 
 impl BoundingBox {
     #[inline]
-    pub fn new(min: Vec3, max: Vec3) -> Self {
+    pub fn new(min: Vec3A, max: Vec3A) -> Self {
         Self { min, max }
     }
 

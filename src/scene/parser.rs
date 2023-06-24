@@ -7,7 +7,7 @@ use crate::primitives::{
 
 use crate::{material, scene::object::Object};
 
-use glam::{Vec2, Vec3};
+use glam::{Vec2, Vec3A};
 
 use nom::{
     branch::alt,
@@ -218,15 +218,15 @@ fn extract_parts_obj(input: &str) -> IResult<&str, (String, String, HashMap<Stri
     Ok((input, (vertex_data, material_file, object_map)))
 }
 
-type VertexData = (Vec<Vec3>, Vec<Vec3>, Vec<Vec2>);
+type VertexData = (Vec<Vec3A>, Vec<Vec3A>, Vec<Vec2>);
 
 /// Input an obj file and return the vertex data, material file name and object
 /// map.
 ///
 /// ### Returns
 /// A tuple containing vertex data:
-/// - vertex positions (Vec<Vec3>). A vector containing the vertex positions.
-/// - vertex normals (Vec<Vec3>). A vector containing the vertex normals.
+/// - vertex positions (Vec<Vec3A>). A vector containing the vertex positions.
+/// - vertex normals (Vec<Vec3A>). A vector containing the vertex normals.
 /// - vetex texture coordinates (Vec<Vec2>). A vector containing the vertex
 fn get_vertex_data(input: &str) -> IResult<&str, VertexData> {
     if let Ok((_, (vp, vn, vt))) = trianglemesh::parser::parse_vertex_data(input) {

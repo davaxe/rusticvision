@@ -1,6 +1,6 @@
 use super::*;
 
-use glam::{Vec2, Vec3};
+use glam::{Vec2, Vec3A};
 
 #[test]
 fn parse_single_vertex_position_test() {
@@ -11,7 +11,7 @@ fn parse_single_vertex_position_test() {
     assert_eq!(n.len(), 0);
     assert_eq!(m.len(), 0);
 
-    let expected_pos = vec![Vec3::new(0.0, 0.0, 0.0)];
+    let expected_pos = vec![Vec3A::new(0.0, 0.0, 0.0)];
     assert_eq!(p, expected_pos);
 }
 
@@ -24,7 +24,7 @@ fn parse_single_vertex_normal_test() {
     assert_eq!(n.len(), 1);
     assert_eq!(m.len(), 0);
 
-    let expected_normal = vec![Vec3::new(1.0, 0.0, 0.0)];
+    let expected_normal = vec![Vec3A::new(1.0, 0.0, 0.0)];
     assert_eq!(n, expected_normal);
 }
 
@@ -56,14 +56,14 @@ vt 0.375000 0.500000";
     assert_eq!(m.len(), 2);
 
     let expected_pos = vec![
-        Vec3::new(1.000000, 1.000000, -1.000000),
-        Vec3::new(1.000000, -1.000000, -1.000000),
+        Vec3A::new(1.000000, 1.000000, -1.000000),
+        Vec3A::new(1.000000, -1.000000, -1.000000),
     ];
     assert_eq!(p, expected_pos);
 
     let expected_normal = vec![
-        Vec3::new(-0.0000, 1.0000, -0.0000),
-        Vec3::new(-0.0000, -0.0000, 1.0000),
+        Vec3A::new(-0.0000, 1.0000, -0.0000),
+        Vec3A::new(-0.0000, -0.0000, 1.0000),
     ];
 
     assert_eq!(n, expected_normal);

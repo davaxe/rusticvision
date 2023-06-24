@@ -1,6 +1,6 @@
 use crate::scene::{self, camera::CameraBuilder, Camera, Scene, SceneRenderer};
 
-use glam::Vec3;
+use glam::Vec3A;
 use image::RgbImage;
 
 pub struct RayTracer {
@@ -65,7 +65,7 @@ impl RayTracer {
     /// Sets camera position.
     #[inline]
     pub fn camera_position(mut self, x: f32, y: f32, z: f32) -> Self {
-        self.camera_builder = self.camera_builder.with_position(Vec3::new(x, y, z));
+        self.camera_builder = self.camera_builder.with_position(Vec3A::new(x, y, z));
         self
     }
 
@@ -73,7 +73,7 @@ impl RayTracer {
     /// origin (0, 0, 0).
     #[inline]
     pub fn camera_target(mut self, x: f32, y: f32, z: f32) -> Self {
-        self.camera_builder = self.camera_builder.with_target(Vec3::new(x, y, z));
+        self.camera_builder = self.camera_builder.with_target(Vec3A::new(x, y, z));
         self
     }
 

@@ -2,7 +2,7 @@ use crate::primitives::Position;
 
 use super::{Normal, TexCoord};
 
-use glam::{Vec2, Vec3};
+use glam::{Vec2, Vec3A};
 
 use nom::{
     self,
@@ -62,7 +62,7 @@ pub fn parse_vertex_data(
 fn parse_vertex_position(input: &str) -> IResult<&str, VertexParseResult> {
     let (input, _) = tag("v ")(input)?;
     let (input, a) = separated_list1(space1, float)(input)?;
-    let pos = Vec3::from_slice(&a);
+    let pos = Vec3A::from_slice(&a);
     Ok((input, VertexParseResult::Position(pos)))
 }
 
@@ -71,7 +71,7 @@ fn parse_vertex_position(input: &str) -> IResult<&str, VertexParseResult> {
 fn parse_vertex_normal(input: &str) -> IResult<&str, VertexParseResult> {
     let (input, _) = tag("vn ")(input)?;
     let (input, a) = separated_list1(space1, float)(input)?;
-    let pos = Vec3::from_slice(&a).normalize();
+    let pos = Vec3A::from_slice(&a).normalize();
     Ok((
         input,
         VertexParseResult::Normal(pos))

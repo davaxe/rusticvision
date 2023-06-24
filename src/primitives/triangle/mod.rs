@@ -4,7 +4,7 @@ use crate::traits::Intersectable;
 
 use super::{Hit, Normal, Position, Ray};
 
-use glam::Vec3;
+use glam::Vec3A;
 
 /// Single indices of a triangle.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -150,7 +150,7 @@ impl<'mesh> Triangle<'mesh> {
     /// Returns the minimum vertex positions of the triangle. This is useful
     /// for bounding box calculations.
     #[inline]
-    pub fn min(&self) -> Vec3 {
+    pub fn min(&self) -> Vec3A {
         let (&v0, &v1, &v2) = self.vertex_positions;
         v0.min(v1).min(v2)
     }
@@ -158,7 +158,7 @@ impl<'mesh> Triangle<'mesh> {
     /// Returns the maximum vertex positions of the triangle. This is useful
     /// for bounding box calculations.
     #[inline]
-    pub fn max(&self) -> Vec3 {
+    pub fn max(&self) -> Vec3A {
         let (&v0, &v1, &v2) = self.vertex_positions;
         v0.max(v1).max(v2)
     }

@@ -2,7 +2,7 @@ use crate::primitives::{BoundingBox, Hit, Ray, TriangleIndex, TriangleMesh};
 
 use crate::traits::Intersectable;
 
-use glam::Vec3;
+use glam::Vec3A;
 
 /// Struct representing an object in the scene. An object is essentially a collections
 /// of triangles.
@@ -30,8 +30,8 @@ impl<'mesh> Object<'mesh> {
     }
 
     fn bounding_box(triangles: &[TriangleIndex], mesh: &TriangleMesh) -> BoundingBox {
-        let mut min_coordinates = Vec3::splat(f32::INFINITY);
-        let mut max_coordinates = Vec3::splat(f32::NEG_INFINITY);
+        let mut min_coordinates = Vec3A::splat(f32::INFINITY);
+        let mut max_coordinates = Vec3A::splat(f32::NEG_INFINITY);
         triangles.iter().for_each(|t_idx| {
             let tri = mesh.get_triangle(t_idx);
             min_coordinates = min_coordinates.min(tri.min());

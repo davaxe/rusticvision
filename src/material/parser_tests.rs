@@ -1,6 +1,6 @@
 use super::{parser, Material};
 
-use glam::Vec3;
+use glam::Vec3A;
 
 #[test]
 fn single_materials_test() {
@@ -19,11 +19,11 @@ illum 2";
 
     let expected_materials = vec![
         Material {
-            ambient_color: Vec3::new(1.0, 1.0, 1.0),
-            diffuse_color: Vec3::new(0.8, 0.8, 0.8),
-            specular_color: Vec3::new(0.5, 0.5, 0.5),
+            ambient_color: Vec3A::new(1.0, 1.0, 1.0),
+            diffuse_color: Vec3A::new(0.8, 0.8, 0.8),
+            specular_color: Vec3A::new(0.5, 0.5, 0.5),
             specular_highlight: 250.0,
-            emissive_color: Vec3::new(0.0, 0.0, 0.0),
+            emissive_color: Vec3A::new(0.0, 0.0, 0.0),
             transparency: 1.0,
             index_of_refraction: 1.45,
         }
@@ -55,20 +55,20 @@ d 1.000000
 illum 2";
     let expected_materials = vec![
         Material {
-            ambient_color: Vec3::new(1.0, 1.0, 1.0),
-            diffuse_color: Vec3::new(0.8, 0.8, 0.8),
-            specular_color: Vec3::new(0.5, 0.5, 0.5),
+            ambient_color: Vec3A::new(1.0, 1.0, 1.0),
+            diffuse_color: Vec3A::new(0.8, 0.8, 0.8),
+            specular_color: Vec3A::new(0.5, 0.5, 0.5),
             specular_highlight: 250.0,
-            emissive_color: Vec3::new(0.0, 0.0, 0.0),
+            emissive_color: Vec3A::new(0.0, 0.0, 0.0),
             transparency: 1.0,
             index_of_refraction: 1.45,
         },
         Material {
-            ambient_color: Vec3::new(1.0, 0.0, 0.0),
-            diffuse_color: Vec3::new(1.0, 0.0, 0.0),
-            specular_color: Vec3::new(0.5, 0.5, 0.5),
+            ambient_color: Vec3A::new(1.0, 0.0, 0.0),
+            diffuse_color: Vec3A::new(1.0, 0.0, 0.0),
+            specular_color: Vec3A::new(0.5, 0.5, 0.5),
             specular_highlight: 250.0,
-            emissive_color: Vec3::new(0.0, 0.0, 0.0),
+            emissive_color: Vec3A::new(0.0, 0.0, 0.0),
             transparency: 1.0,
             index_of_refraction: 1.45,
         }

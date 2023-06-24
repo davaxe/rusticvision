@@ -10,15 +10,15 @@ use nom::{
     IResult,
 };
 
-use glam::Vec3;
+use glam::Vec3A;
 
 use super::Material;
 
 enum MaterialProperty {
-    AmbientColor(Vec3),
-    DiffuseColor(Vec3),
-    SpecularColor(Vec3),
-    EmissiveColor(Vec3),
+    AmbientColor(Vec3A),
+    DiffuseColor(Vec3A),
+    SpecularColor(Vec3A),
+    EmissiveColor(Vec3A),
     SpecularHighlight(f32),
     Transparency(f32),
     IndexOfRefraction(f32),
@@ -95,21 +95,21 @@ fn parse_material_name(input: &str) -> IResult<&str, &str> {
 fn parse_ambient_color(input: &str) -> IResult<&str, MaterialProperty> {
     let (input, _) = tag("Ka ")(input)?;
     let (input, a) = separated_list1(space1, float)(input)?;
-    Ok((input, MaterialProperty::AmbientColor(Vec3::from_slice(&a))))
+    Ok((input, MaterialProperty::AmbientColor(Vec3A::from_slice(&a))))
 }
 
 /// Parse diffuse color property.
 fn parse_diffuse_color(input: &str) -> IResult<&str, MaterialProperty> {
     let (input, _) = tag("Kd ")(input)?;
     let (input, a) = separated_list1(space1, float)(input)?;
-    Ok((input, MaterialProperty::DiffuseColor(Vec3::from_slice(&a))))
+    Ok((input, MaterialProperty::DiffuseColor(Vec3A::from_slice(&a))))
 }
 
 /// Parse specular color property.
 fn parse_specular_color(input: &str) -> IResult<&str, MaterialProperty> {
     let (input, _) = tag("Ks ")(input)?;
     let (input, a) = separated_list1(space1, float)(input)?;
-    Ok((input, MaterialProperty::SpecularColor(Vec3::from_slice(&a))))
+    Ok((input, MaterialProperty::SpecularColor(Vec3A::from_slice(&a))))
 }
 
 /// Parse specular highlight property.
@@ -123,7 +123,7 @@ fn parse_specular_highlight(input: &str) -> IResult<&str, MaterialProperty> {
 fn parse_emissive_color(input: &str) -> IResult<&str, MaterialProperty> {
     let (input, _) = tag("Ke ")(input)?;
     let (input, a) = separated_list1(space1, float)(input)?;
-    Ok((input, MaterialProperty::EmissiveColor(Vec3::from_slice(&a))))
+    Ok((input, MaterialProperty::EmissiveColor(Vec3A::from_slice(&a))))
 }
 
 /// Parse transparency property.

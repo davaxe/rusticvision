@@ -1,4 +1,4 @@
-use glam::Vec3;
+use glam::Vec3A;
 
 use crate::material::Material;
 
@@ -9,19 +9,19 @@ use super::{Normal, Position, TriangleIndex, TriangleMesh};
 #[derive(Debug, Clone, Copy)]
 pub struct Ray {
     pub origin: Position,
-    pub direction: Vec3,
+    pub direction: Vec3A,
 }
 
 impl Ray {
     /// Creates a new ray from the given origin and direction.
     #[inline]
-    pub fn new(origin: Vec3, direction: Vec3) -> Self {
+    pub fn new(origin: Vec3A, direction: Vec3A) -> Self {
         Self { origin, direction }
     }
 
     /// Returns the position of the ray at the given t value.
     #[inline]
-    pub fn at(&self, t: f32) -> Vec3 {
+    pub fn at(&self, t: f32) -> Vec3A {
         self.origin + self.direction * t
     }
 
@@ -42,7 +42,7 @@ impl Ray {
     /// zero vectors).
     #[inline]
     pub fn is_default(&self) -> bool {
-        self.direction == Vec3::ZERO
+        self.direction == Vec3A::ZERO
     }
 }
 
@@ -51,8 +51,8 @@ impl Default for Ray {
     /// A direction of zero length is not a valid direction.
     fn default() -> Self {
         Self {
-            origin: Vec3::ZERO,
-            direction: Vec3::ZERO,
+            origin: Vec3A::ZERO,
+            direction: Vec3A::ZERO,
         }
     }
 }
@@ -140,7 +140,7 @@ impl Hit {
         let phi = rand::random::<f32>() * std::f32::consts::PI;
 
         let spherical_point =
-            Vec3::new(phi.sin() * theta.cos(), phi.sin() * theta.sin(), phi.cos());
+            Vec3A::new(phi.sin() * theta.cos(), phi.sin() * theta.sin(), phi.cos());
 
         let direction =
             right * spherical_point.x + forward * spherical_point.y + up * spherical_point.z;
