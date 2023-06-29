@@ -12,7 +12,7 @@ use nom::{
 
 use glam::Vec3A;
 
-use super::Material;
+use crate::material::Material;
 
 enum MaterialProperty {
     AmbientColor(Vec3A),
@@ -71,7 +71,7 @@ fn material_from_properties(properties: &Vec<MaterialProperty>) -> Material {
             SpecularHighlight(h) => material.specular_highlight = *h,
             Transparency(t) => material.transparency = *t,
             IndexOfRefraction(i) => material.index_of_refraction = *i,
-            IlluminationModel(_m) => (),
+            IlluminationModel(_) => (),
         }
     }
     material
@@ -80,7 +80,8 @@ fn material_from_properties(properties: &Vec<MaterialProperty>) -> Material {
 fn parse_material(input: &str) -> IResult<&str, (&str, Vec<MaterialProperty>)> {
     let (input, material_name) = parse_material_name(input)?;
     let (input, _) = line_ending(input)?;
-    let (input, material_properties) = separated_list1(line_ending, parse_material_property)(input)?;
+    let (input, material_properties) =
+        separated_list1(line_ending, parse_material_property)(input)?;
     Ok((input, (material_name, material_properties)))
 }
 
@@ -109,7 +110,10 @@ fn parse_diffuse_color(input: &str) -> IResult<&str, MaterialProperty> {
 fn parse_specular_color(input: &str) -> IResult<&str, MaterialProperty> {
     let (input, _) = tag("Ks ")(input)?;
     let (input, a) = separated_list1(space1, float)(input)?;
-    Ok((input, MaterialProperty::SpecularColor(Vec3A::from_slice(&a))))
+    Ok((
+        input,
+        MaterialProperty::SpecularColor(Vec3A::from_slice(&a)),
+    ))
 }
 
 /// Parse specular highlight property.
@@ -123,7 +127,10 @@ fn parse_specular_highlight(input: &str) -> IResult<&str, MaterialProperty> {
 fn parse_emissive_color(input: &str) -> IResult<&str, MaterialProperty> {
     let (input, _) = tag("Ke ")(input)?;
     let (input, a) = separated_list1(space1, float)(input)?;
-    Ok((input, MaterialProperty::EmissiveColor(Vec3A::from_slice(&a))))
+    Ok((
+        input,
+        MaterialProperty::EmissiveColor(Vec3A::from_slice(&a)),
+    ))
 }
 
 /// Parse transparency property.

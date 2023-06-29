@@ -1,6 +1,4 @@
-use crate::primitives::Position;
-
-use super::{Normal, TexCoord};
+use crate::primitives::{Normal, Position, TexCoord};
 
 use glam::{Vec2, Vec3A};
 

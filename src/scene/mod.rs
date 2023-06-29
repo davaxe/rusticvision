@@ -1,7 +1,8 @@
 pub mod camera;
 pub mod object;
-pub mod parser;
 pub mod renderer;
+
+use std::sync::Arc;
 
 use crate::{
     material::Material,
@@ -14,14 +15,14 @@ use object::Object;
 pub use camera::Camera;
 pub use renderer::SceneRenderer;
 
-pub struct Scene<'this> {
-    objects: Vec<Object<'this>>,
-    triangle_mesh: &'this TriangleMesh,
+pub struct Scene {
+    objects: Vec<Object>,
+    triangle_mesh: Arc<TriangleMesh>,
 }
 
-impl<'this> Scene<'this> {
+impl Scene {
     #[inline]
-    pub fn new(triangle_mesh: &'this TriangleMesh, objects: Vec<Object<'this>>) -> Self {
+    pub fn new(triangle_mesh: Arc<TriangleMesh>, objects: Vec<Object>) -> Self {
         Self {
             objects,
             triangle_mesh,
@@ -35,12 +36,12 @@ impl<'this> Scene<'this> {
 
     /// Get reference to the triangle mesh.
     #[inline]
-    pub fn triangle_mesh(&self) -> &'this TriangleMesh {
-        self.triangle_mesh
+    pub fn triangle_mesh(&self) -> &TriangleMesh {
+        self.triangle_mesh.as_ref()
     }
 }
 
-impl<'this> Intersectable for Scene<'this> {
+impl Intersectable for Scene {
     fn intersect(&self, ray: &Ray, t_min: f32, t_max: f32) -> Option<Hit> {
         let mut closest_hit: Option<Hit> = None;
         for object in &self.objects {

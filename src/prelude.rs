@@ -1,4 +1,9 @@
-use crate::scene::{self, camera::CameraBuilder, Camera, Scene, SceneRenderer};
+
+
+use crate::{
+    parser,
+    scene::{camera::CameraBuilder, Camera, Scene, SceneRenderer},
+};
 
 use glam::Vec3A;
 use image::RgbImage;
@@ -121,11 +126,11 @@ impl RayTracer {
             None => &built_camera,
         };
 
-        let (mesh, mat_map, obj_map) =
-            scene::parser::get_triangle_mesh_and_obj_map(directory, obj_file);
-        let objects = scene::parser::get_objects(&mesh, &obj_map, &mat_map);
+        let (mesh, mat_map, obj_map) = parser::get_triangle_mesh_and_obj_map(directory, obj_file);
 
-        let scene = Scene::new(&mesh, objects);
+        let (objects, mesh) = parser::get_objects(mesh, &obj_map, &mat_map);
+
+        let scene = Scene::new(mesh, objects);
         let mut renderer = SceneRenderer::new(camera, &scene);
 
         renderer.set_sample_count(self.sample_count.unwrap_or(1));

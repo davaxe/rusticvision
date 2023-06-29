@@ -1,13 +1,4 @@
-use std::collections::HashMap;
-
-use crate::primitives::{
-    triangle,
-    trianglemesh::{self, TriangleMesh},
-};
-
-use crate::{material, scene::object::Object};
-
-use glam::{Vec2, Vec3A};
+use std::{collections::HashMap, sync::Arc};
 
 use nom::{
     branch::alt,
@@ -18,17 +9,35 @@ use nom::{
     IResult,
 };
 
+use crate::{primitives::TriangleMesh, scene::object::Object};
+
+mod face_parser;
+mod material_parser;
+mod vertex_parser;
+
+struct ObjParts {
+    // A string containing the vertex data (positions, normals, textures
+    // coordinates)
+    pub vertex_data: String,
+
+    // The name of the material file to be used.
+    pub material_file_name: String,
+
+    // Map from object name to the faces of the object (material included)
+    pub object_map: HashMap<String, String>,
+}
+
 #[derive(Debug)]
-enum ParseLineResult<'a> {
-    VertexPosition(&'a str),
-    VertexNormal(&'a str),
-    VertexTexture(&'a str),
-    ObjectName(&'a str),
-    UseMaterial(&'a str),
-    Face(&'a str),
-    MaterialFile(&'a str),
-    Comment(&'a str),
-    Other(&'a str),
+enum ParseLineResult<'original> {
+    VertexPosition(&'original str),
+    VertexNormal(&'original str),
+    VertexTexture(&'original str),
+    ObjectName(&'original str),
+    UseMaterial(&'original str),
+    Face(&'original str),
+    MaterialFile(&'original str),
+    Comment(&'original str),
+    Other(&'original str),
 }
 
 /// Get triangle mesh and an object map from an obj file. The obj file is
@@ -63,37 +72,52 @@ pub fn get_triangle_mesh_and_obj_map(
     let obj_file = std::fs::read_to_string(obj_path).expect("PARSE_OBJ: Unable to read obj file");
 
     // Extract the vertex data, material file and object map from the obj file
-    let (_, (v_data, material_file, object_map)) =
+    let (_, object_parts) =
         extract_parts_obj(&obj_file).expect("PARSE_OBJ: Failed to extract parts from obj file");
 
     // Get vertex data from the vertex data string
-    let (_, (vp, vn, _)) = get_vertex_data(&v_data).unwrap();
+    let (_, (vp, vn, _)) = vertex_parser::parse_vertex_data(&object_parts.vertex_data).unwrap();
 
     // Load the materials from the material file.
-    let mat_path = format!("{}/{}", directory, material_file);
+    let mat_path = format!("{}/{}", directory, object_parts.material_file_name);
     let mat_file = std::fs::read_to_string(mat_path.trim_end())
         .expect("PARSE_OBJ: Unable to read material file");
-    let (_, (materials, material_map)) = material::parser::materials(&mat_file).unwrap();
+    let (_, (materials, material_map)) = material_parser::materials(&mat_file).unwrap();
 
     // Create the triangle mesh that stores the vertex data and materials
-    let triangle_mesh = TriangleMesh::new(vp, vn, materials);
+    let triangle_mesh = TriangleMesh::new(vp, vn, materials, vec![]);
 
-    (triangle_mesh, material_map, object_map)
+    (triangle_mesh, material_map, object_parts.object_map)
 }
 
-pub fn get_objects<'a, 'b>(
-    triangle_mesh: &'a TriangleMesh,
-    object_map: &'b HashMap<String, String>,
-    material_map: &'b HashMap<String, usize>,
-) -> Vec<Object<'a>> {
-    let mut objects = Vec::new();
+pub fn get_objects(
+    triangle_mesh: TriangleMesh,
+    object_map: &HashMap<String, String>,
+    material_map: &HashMap<String, usize>,
+) -> (Vec<Object>, Arc<TriangleMesh>) {
+    // Save data for later use, so we can create the objects when we have the
+    // triangle full triangle mesh.
+    let mut objects_data: Vec<(String, usize, usize)> = Vec::new();
+    let mut triangle_mesh = triangle_mesh;
     for (name, faces_str) in object_map {
-        let (_, indices) = triangle::parser::parse_triangle_indices(faces_str, material_map)
+        let (_, indices) = face_parser::parse_triangle_indices(faces_str, material_map)
             .expect("PARSE: Failed to parse triangle faces");
-        let object = Object::new(name.to_owned(), indices, triangle_mesh);
-        objects.push(object);
+        objects_data.push((
+            name.clone(),
+            triangle_mesh.triangle_indices().len(),
+            indices.len(),
+        ));
+        triangle_mesh.extend_triangle_indices(&indices);
     }
-    objects
+
+    let triangle_mesh = Arc::new(triangle_mesh);
+
+    let objects = objects_data
+        .into_iter()
+        .map(|(name, start, count)| Object::new(name, start, count, Arc::clone(&triangle_mesh)))
+        .collect();
+
+    (objects, triangle_mesh)
 }
 
 /// Parse a line of the input string slice.
@@ -110,50 +134,50 @@ fn parse_vertex_position(input: &str) -> IResult<&str, ParseLineResult> {
 
 /// Parse the vertex normal data (string format) from the input string slice.
 fn parse_vertex_normal(input: &str) -> IResult<&str, ParseLineResult> {
-    let (input, pos) = preceded(tag("vn "), line)(input)?;
-    Ok((input, ParseLineResult::VertexNormal(pos)))
+    let (input, normal) = preceded(tag("vn "), line)(input)?;
+    Ok((input, ParseLineResult::VertexNormal(normal)))
 }
 
 /// Parse the vertex texture data (string format) from the input string slice.
 fn parse_vertex_texture(input: &str) -> IResult<&str, ParseLineResult> {
-    let (input, pos) = preceded(tag("vt "), line)(input)?;
-    Ok((input, ParseLineResult::VertexTexture(pos)))
+    let (input, texture) = preceded(tag("vt "), line)(input)?;
+    Ok((input, ParseLineResult::VertexTexture(texture)))
 }
 
 /// Parse the object name from the input string slice.
 fn parse_object_name(input: &str) -> IResult<&str, ParseLineResult> {
-    let (input, pos) = preceded(tag("o "), line)(input)?;
-    Ok((input, ParseLineResult::ObjectName(pos)))
+    let (input, object_name) = preceded(tag("o "), line)(input)?;
+    Ok((input, ParseLineResult::ObjectName(object_name)))
 }
 
 /// Parse the material name from the input string slice.
 fn parse_use_material(input: &str) -> IResult<&str, ParseLineResult> {
-    let (input, pos) = preceded(tag("usemtl "), line)(input)?;
-    Ok((input, ParseLineResult::UseMaterial(pos)))
+    let (input, use_mtl) = preceded(tag("usemtl "), line)(input)?;
+    Ok((input, ParseLineResult::UseMaterial(use_mtl)))
 }
 
 /// Parse the face data (string format) from the input string slice.
 fn parse_face(input: &str) -> IResult<&str, ParseLineResult> {
-    let (input, pos) = preceded(tag("f "), line)(input)?;
-    Ok((input, ParseLineResult::Face(pos)))
+    let (input, face) = preceded(tag("f "), line)(input)?;
+    Ok((input, ParseLineResult::Face(face)))
 }
 
 /// Parse the material file name from the input string slice.
 fn parse_material_file(input: &str) -> IResult<&str, ParseLineResult> {
-    let (input, pos) = preceded(tag("mtllib "), line)(input)?;
-    Ok((input, ParseLineResult::MaterialFile(pos)))
+    let (input, mtl_name) = preceded(tag("mtllib "), line)(input)?;
+    Ok((input, ParseLineResult::MaterialFile(mtl_name)))
 }
 
 /// Parse the comment from the input string slice.
 fn parse_comment(input: &str) -> IResult<&str, ParseLineResult> {
-    let (input, pos) = preceded(tag("#"), line)(input)?;
-    Ok((input, ParseLineResult::Comment(pos)))
+    let (input, comment) = preceded(tag("#"), line)(input)?;
+    Ok((input, ParseLineResult::Comment(comment)))
 }
 
 /// Parse the other data from the input string slice.
 fn parse_other(input: &str) -> IResult<&str, ParseLineResult> {
-    let (input, pos) = line(input)?;
-    Ok((input, ParseLineResult::Other(pos)))
+    let (input, other) = line(input)?;
+    Ok((input, ParseLineResult::Other(other)))
 }
 
 /// Parse a line of an obj file. Returns the line as ParseLineResult
@@ -181,7 +205,7 @@ fn parse_obj_line(input: &str) -> IResult<&str, ParseLineResult> {
 /// - material file name (String). The name of the material file to be used.
 /// - object map (HashMap<String, String>) A map from object name to the faces
 ///   of the object.
-fn extract_parts_obj(input: &str) -> IResult<&str, (String, String, HashMap<String, String>)> {
+fn extract_parts_obj(input: &str) -> IResult<&str, ObjParts> {
     let mut vertex_data = String::new();
     let mut material_file = String::new();
     let mut object_map = HashMap::new();
@@ -212,26 +236,15 @@ fn extract_parts_obj(input: &str) -> IResult<&str, (String, String, HashMap<Stri
                     .push_str(&format!("f {}\n", face));
             }
             MaterialFile(file) => material_file.push_str(&format!("{}\n", file)),
-            _ => (),
+            _ => {}
         }
     });
-    Ok((input, (vertex_data, material_file, object_map)))
-}
-
-type VertexData = (Vec<Vec3A>, Vec<Vec3A>, Vec<Vec2>);
-
-/// Input an obj file and return the vertex data, material file name and object
-/// map.
-///
-/// ### Returns
-/// A tuple containing vertex data:
-/// - vertex positions (Vec<Vec3A>). A vector containing the vertex positions.
-/// - vertex normals (Vec<Vec3A>). A vector containing the vertex normals.
-/// - vetex texture coordinates (Vec<Vec2>). A vector containing the vertex
-fn get_vertex_data(input: &str) -> IResult<&str, VertexData> {
-    if let Ok((_, (vp, vn, vt))) = trianglemesh::parser::parse_vertex_data(input) {
-        Ok((input, (vp, vn, vt)))
-    } else {
-        panic!("Failed to parse vertex data");
-    }
+    Ok((
+        input,
+        ObjParts {
+            vertex_data,
+            material_file_name: material_file,
+            object_map,
+        },
+    ))
 }

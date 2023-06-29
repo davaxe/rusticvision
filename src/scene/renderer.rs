@@ -1,8 +1,9 @@
+use std::io::Write;
 use std::sync::{atomic::AtomicU32, Mutex};
 
 use crate::{primitives::Ray, traits::Intersectable};
 
-use super::{Camera, Hit, Scene};
+use super::{Camera, Scene};
 
 use glam::Vec3A;
 use image::RgbImage;
@@ -11,14 +12,14 @@ use rayon::prelude::*;
 
 pub struct SceneRenderer<'scene> {
     camera: &'scene Camera,
-    scene: &'scene Scene<'scene>,
+    scene: &'scene Scene,
     sample_count: u32,
     recursion_depth: u32,
 }
 
 impl<'scene> SceneRenderer<'scene> {
     #[inline]
-    pub fn new(camera: &'scene Camera, scene: &'scene Scene<'scene>) -> Self {
+    pub fn new(camera: &'scene Camera, scene: &'scene Scene) -> Self {
         Self {
             camera,
             scene,
@@ -41,6 +42,8 @@ impl<'scene> SceneRenderer<'scene> {
 
     pub fn render(&self) -> RgbImage {
         let (width, height) = self.camera.get_dimensions();
+        let update_count = width * height / 100;
+        let progress = AtomicU32::new(0);
         let image: Mutex<image::RgbImage> = Mutex::new(RgbImage::new(width, height));
         (0..width)
             .cartesian_product(0..height)
@@ -49,6 +52,11 @@ impl<'scene> SceneRenderer<'scene> {
                 let pixel = self.render_pixel(x, y);
                 let mut image = image.lock().unwrap();
                 image.put_pixel(x, y, Self::vec3_to_rgb(pixel));
+                let progress = progress.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                if progress % update_count == 0 {
+                    print!("\rProgress: {}%", progress / update_count);
+                    std::io::stdout().flush().unwrap();
+                }
             });
         image.into_inner().unwrap()
     }

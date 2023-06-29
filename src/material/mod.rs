@@ -1,5 +1,3 @@
-pub mod parser;
-
 use glam::Vec3A;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -48,6 +46,3 @@ impl Default for Material {
         )
     }
 }
-
-#[cfg(test)]
-mod parser_tests;

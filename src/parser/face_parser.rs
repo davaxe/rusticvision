@@ -1,7 +1,5 @@
 use std::collections::HashMap;
 
-use super::TriangleIndex;
-
 use nom::{
     self,
     branch::alt,
@@ -14,6 +12,8 @@ use nom::{
     sequence::terminated,
     IResult,
 };
+
+use crate::primitives::TriangleIndex;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 enum VertexIndexGroup {

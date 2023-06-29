@@ -1,8 +1,6 @@
 use crate::{material::Material, traits::Intersectable};
 
-use super::{Hit, Normal, Position, Ray, TexCoord, Triangle, TriangleIndex};
-
-pub mod parser;
+use super::{Hit, Normal, Position, Ray, Triangle, TriangleIndex};
 
 /// Triangle mesh primitive. Stores the vertices, triangles and normals that
 /// make up the mesh. Also stores all possible materials that can be applied
@@ -12,6 +10,7 @@ pub struct TriangleMesh {
     vertex_positions: Vec<Position>,
     triangle_normals: Vec<Normal>,
     materials: Vec<Material>,
+    triangle_indices: Vec<TriangleIndex>,
 }
 
 impl TriangleMesh {
@@ -21,36 +20,49 @@ impl TriangleMesh {
         vertex_positions: Vec<Position>,
         triangle_normals: Vec<Normal>,
         triangle_materials: Vec<Material>,
+        triangle_indices: Vec<TriangleIndex>,
     ) -> Self {
         Self {
             vertex_positions,
             triangle_normals,
             materials: triangle_materials,
+            triangle_indices,
         }
     }
 
     /// Get reference to the vertex positions.
     #[inline]
-    pub fn vertex_positions(&self) -> &Vec<Position> {
+    pub fn vertex_positions(&self) -> &[Position] {
         &self.vertex_positions
+    }
+
+    #[inline]
+    pub fn extend_triangle_indices(&mut self, triangle_indices: &[TriangleIndex]) {
+        self.triangle_indices.extend(triangle_indices);
     }
 
     /// Get reference to the triangle normals.
     #[inline]
-    pub fn triangle_normals(&self) -> &Vec<Normal> {
+    pub fn triangle_normals(&self) -> &[Normal] {
         &self.triangle_normals
     }
 
     /// Get reference to the materials.
     #[inline]
-    pub fn materials(&self) -> &Vec<Material> {
+    pub fn materials(&self) -> &[Material] {
         &self.materials
+    }
+
+    #[inline]
+    pub fn triangle_indices(&self) -> &[TriangleIndex]{
+        &self.triangle_indices
     }
 
     /// Get material from material index.
     pub fn get_material(&self, material_index: usize) -> Option<&Material> {
         self.materials.get(material_index)
     }
+
 
     /// Get triangle from triangle index.
     ///
@@ -78,6 +90,11 @@ impl TriangleMesh {
         )
     }
 
+    pub fn get_triangle_from_index(&self, triangle_index: usize) -> Triangle {
+        let triangle_index = self.triangle_indices.get(triangle_index).unwrap();
+        self.get_triangle(triangle_index)
+    }
+
     /// Test if the given ray intersects the given triangle in the mesh.
     ///
     /// ### Arguments
@@ -102,6 +119,3 @@ impl TriangleMesh {
         triangle.intersect(ray, t_min, t_max)
     }
 }
-
-#[cfg(test)]
-mod parser_tests;

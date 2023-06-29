@@ -1,5 +1,4 @@
-use super::{Ray};
-
+use super::Ray;
 
 use glam::Vec3A;
 
@@ -18,6 +17,14 @@ impl BoundingBox {
     /// Check if a ray intersects with the bounding box.
     ///
     /// [Reference](https://medium.com/@bromanz/another-view-on-the-classic-ray-aabb-intersection-algorithm-for-bvh-traversal-41125138b525).
+    ///
+    /// ### Arguments
+    /// - `ray` - The ray to check for intersection.
+    /// - `t_min` - The minimum distance to check for intersection.
+    /// - `t_max` - The maximum distance to check for intersection.
+    ///
+    /// ### Returns
+    /// - `true` if the ray intersects with the bounding box.
     #[inline]
     pub fn intersect(&self, ray: &Ray, t_min: f32, t_max: f32) -> bool {
         let inv_dir = ray.direction.recip();

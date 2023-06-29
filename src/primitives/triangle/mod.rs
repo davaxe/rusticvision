@@ -1,5 +1,3 @@
-pub mod parser;
-
 use crate::traits::Intersectable;
 
 use super::{Hit, Normal, Position, Ray};
@@ -214,6 +212,3 @@ impl<'mesh> Intersectable for Triangle<'mesh> {
         None
     }
 }
-
-#[cfg(test)]
-mod parser_tests;
