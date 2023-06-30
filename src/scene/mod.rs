@@ -10,6 +10,7 @@ use crate::{
     traits::Intersectable,
 };
 
+use itertools::Itertools;
 use object::Object;
 
 pub use camera::Camera;
@@ -38,6 +39,37 @@ impl Scene {
     #[inline]
     pub fn triangle_mesh(&self) -> &TriangleMesh {
         self.triangle_mesh.as_ref()
+    }
+
+    pub fn gpu_vertex_pos_data(&self) -> Vec<[f32; 4]> {
+        self.triangle_mesh
+            .vertex_positions()
+            .iter()
+            .map(|&v| [v.x, v.y, v.z, 0.0])
+            .collect()
+    }
+
+    pub fn gpu_triangle_normal_data(&self) -> Vec<[f32; 4]> {
+        self.triangle_mesh
+            .triangle_normals()
+            .iter()
+            .map(|&v| [v.x, v.y, v.z, 0.0])
+            .collect()
+    }
+
+    pub fn gpu_triangle_index_data(&self) -> Vec<[u32; 5]> {
+        self.triangle_mesh
+            .triangle_indices()
+            .iter()
+            .map(|t_idx| {
+                let (v1, v2, v3, n, m) = t_idx.indices();
+                [v1 as u32, v2 as u32, v3 as u32, n as u32, m as u32]
+            })
+            .collect_vec()
+    }
+
+    pub fn gpu_material_data(&self) -> Vec<Material> {
+        todo!()
     }
 }
 

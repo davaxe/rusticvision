@@ -1,4 +1,4 @@
-use glam::{Mat4, Vec2, Vec3A, Vec4, Vec3, Vec4Swizzles};
+use glam::{Mat4, Vec2, Vec3, Vec3A, Vec4, Vec4Swizzles};
 
 use crate::primitives::Ray;
 
@@ -50,6 +50,18 @@ impl Camera {
         }
     }
 
+    pub fn get_inverse_projection(&self) -> Mat4 {
+        self.inverse_projection
+    }
+
+    pub fn get_inverse_view(&self) -> Mat4 {
+        self.inverse_view
+    }
+
+    pub fn get_position(&self) -> Vec3A {
+        self.position
+    }
+
     /// Get all rays from the camera.
     pub fn get_camera_rays(&self) -> Vec<Ray> {
         let mut rays = Vec::with_capacity((self.width * self.height) as usize);
@@ -93,7 +105,6 @@ impl Camera {
         let ray_dir = (self.inverse_view * Vec4::new(target.x, target.y, target.z, 0.0)).xyz();
         Ray::new(self.position, ray_dir.into())
     }
-
 }
 
 impl Default for Camera {

@@ -11,10 +11,10 @@ use glam::Vec3A;
 #[derive(Debug)]
 pub struct Object {
     pub identifier: String,
-    triangle_start_index: usize,
-    triangle_count: usize,
+    pub triangle_start_index: usize,
+    pub triangle_count: usize,
     mesh: Arc<TriangleMesh>,
-    bounding_box: BoundingBox,
+    pub bounding_box: BoundingBox,
 }
 
 impl Object {

@@ -1,12 +1,11 @@
-
-
 use crate::{
     parser,
-    scene::{camera::CameraBuilder, Camera, Scene, SceneRenderer},
+    scene::{camera::CameraBuilder, renderer::GPUSceneRenderer, Camera, Scene, SceneRenderer},
 };
 
 use glam::Vec3A;
-use image::RgbImage;
+use image::{Pixel, Rgb, RgbImage};
+use itertools::Itertools;
 
 pub struct RayTracer {
     camera_builder: CameraBuilder,
@@ -146,6 +145,47 @@ impl RayTracer {
     pub fn render_save(&self, file_path: &str) {
         let image = self.render();
         image.save(file_path).unwrap();
+    }
+
+    pub fn render_gpu(&self) {
+        // Directory and obj file must be specified
+        if self.directory.is_none() || self.obj_file.is_none() {
+            panic!("Directory and obj file must be specified");
+        }
+
+        let directory = self.directory.as_ref().unwrap();
+        let obj_file = self.obj_file.as_ref().unwrap();
+
+        let built_camera = self.camera_builder.clone().build();
+
+        let camera = match &self.camera {
+            Some(camera) => camera,
+            None => &built_camera,
+        };
+
+        let (mesh, mat_map, obj_map) = parser::get_triangle_mesh_and_obj_map(directory, obj_file);
+
+        let (objects, mesh) = parser::get_objects(mesh, &obj_map, &mat_map);
+
+        let scene = Scene::new(mesh, objects);
+        let renderer = GPUSceneRenderer::new(camera, &scene);
+        let a = pollster::block_on(renderer.render()).unwrap();
+
+        let (width, height) = camera.get_dimensions();
+
+        let mut image = RgbImage::new(width, height);
+
+        (0..width).cartesian_product(0..height).for_each(|(x, y)| {
+            let index = (x + (height - y - 1) * width) as usize;
+            let [r, g, b, _] = a[index];
+            let r = (r * 255.0) as u8;
+            let g = (g * 255.0) as u8;
+            let b = (b * 255.0) as u8;
+            let pixel = Rgb([r, g, b]);
+            image.put_pixel(x, y, pixel);
+        });
+
+        image.save("test.png").unwrap();
     }
 }
 

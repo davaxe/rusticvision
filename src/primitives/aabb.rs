@@ -1,6 +1,6 @@
 use super::Ray;
 
-use glam::Vec3A;
+use glam::{Vec3, Vec3A};
 
 #[derive(Debug)]
 pub struct BoundingBox {
@@ -38,5 +38,17 @@ impl BoundingBox {
         let t_max = t_max.min(t_big.min_element());
 
         t_max >= t_min
+    }
+
+    pub fn min(&self) -> Vec3 {
+        self.min.into()
+    }
+
+    pub fn max(&self) -> Vec3 {
+        self.max.into()
+    }
+
+    pub fn bounds(&self) -> (Vec3, Vec3) {
+        (self.min.into(), self.max.into())
     }
 }
