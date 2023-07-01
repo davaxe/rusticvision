@@ -4,4 +4,6 @@ mod material;
 mod traits;
 mod parser;
 
+mod data_structures;
+
 pub mod prelude;

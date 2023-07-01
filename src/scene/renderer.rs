@@ -4,6 +4,7 @@ use std::num::{NonZeroU32, NonZeroU64};
 use std::sync::{atomic::AtomicU32, Mutex};
 use wgpu::util::DeviceExt;
 
+use crate::data_structures::BoundingBoxData;
 use crate::{primitives::Ray, traits::Intersectable};
 
 use super::{Camera, Scene};
@@ -139,7 +140,7 @@ impl<'scene> GPUSceneRenderer<'scene> {
             .await?;
 
         let limits = wgpu::Limits {
-            max_dynamic_storage_buffers_per_pipeline_layout: 8,
+            max_dynamic_storage_buffers_per_pipeline_layout: 9,
             ..Default::default()
         };
 
@@ -186,11 +187,11 @@ impl<'scene> GPUSceneRenderer<'scene> {
         let vertex_position_buffer = self.vertex_position_buffer(device);
         let vertex_normal_buffer = self.vertex_normal_buffer(device);
         let triangle_index_buffer = self.triangle_index_buffer(device);
-        // let material_buffer = self.material_buffer();
         let (obj_buffer, aabb_buffer) = self.object_buffer(device);
         let pixel_buffer = self.pixel_buffer(device);
         let camera_data_buffer = self.camera_data_buffer(device);
         let random_buffer = self.random_numbers_buffer(device);
+        let material_buffer = self.material_buffer(device);
 
         let compute_pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
             label: Some("Compute pipeline"),
@@ -200,7 +201,7 @@ impl<'scene> GPUSceneRenderer<'scene> {
         });
 
         let bind_group_layout = compute_pipeline.get_bind_group_layout(0);
-        let bind_group_0 = device.create_bind_group(&wgpu::BindGroupDescriptor {
+        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: None,
             layout: &bind_group_layout,
             entries: &[
@@ -230,11 +231,15 @@ impl<'scene> GPUSceneRenderer<'scene> {
                 },
                 wgpu::BindGroupEntry {
                     binding: 6,
-                    resource: camera_data_buffer.as_entire_binding(),
+                    resource: material_buffer.as_entire_binding(),
                 },
                 wgpu::BindGroupEntry {
                     binding: 7,
                     resource: random_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 8,
+                    resource: camera_data_buffer.as_entire_binding(),
                 },
             ],
         });
@@ -245,9 +250,9 @@ impl<'scene> GPUSceneRenderer<'scene> {
             let mut cpass =
                 encoder.begin_compute_pass(&wgpu::ComputePassDescriptor { label: None });
             cpass.set_pipeline(&compute_pipeline);
-            cpass.set_bind_group(0, &bind_group_0, &[]);
+            cpass.set_bind_group(0, &bind_group, &[]);
             cpass.insert_debug_marker("Ray trace test");
-            cpass.dispatch_workgroups(width * height / 144, 1, 1);
+            cpass.dispatch_workgroups(width * height / 145 + 1, 1, 1);
         }
 
         encoder.copy_buffer_to_buffer(&pixel_buffer, 0, &staging_buffer, 0, size);
@@ -316,8 +321,15 @@ impl<'scene> GPUSceneRenderer<'scene> {
         )
     }
 
-    fn material_buffer(&self) -> wgpu::Buffer {
-        todo!()
+    fn material_buffer(&self, device: &wgpu::Device) -> wgpu::Buffer {
+        Self::create_buffer(
+            Some("Material buffer"),
+            device,
+            bytemuck::cast_slice(self.scene.gpu_material_data().as_slice()),
+            wgpu::BufferUsages::STORAGE
+                | wgpu::BufferUsages::COPY_DST
+                | wgpu::BufferUsages::COPY_SRC,
+        )
     }
 
     fn object_buffer(&self, device: &wgpu::Device) -> (wgpu::Buffer, wgpu::Buffer) {
@@ -336,7 +348,6 @@ impl<'scene> GPUSceneRenderer<'scene> {
             let values = [min.x, min.y, min.z, 0f32, max.x, max.y, max.z, 0f32]; // Zeroes are padding
             aabb_vec.push(values);
         }
-        println!("First AABB: {:?}", aabb_vec[0]);
         let object_buffer = Self::create_buffer(
             Some("Object buffer"),
             device,
@@ -379,6 +390,7 @@ impl<'scene> GPUSceneRenderer<'scene> {
         let inverse_view = self.camera.get_inverse_view().to_cols_array();
         let inverse_projection = self.camera.get_inverse_projection().to_cols_array();
         let position = self.camera.get_position().to_array();
+        // vec4 is used in shader, to make sure the data is aligned correctly
         let position = [position[0], position[1], position[2], 0f32];
         let mut data = position
             .iter()
@@ -391,14 +403,14 @@ impl<'scene> GPUSceneRenderer<'scene> {
         let (width, height) = self.camera.get_dimensions();
         data.extend(bytemuck::bytes_of(&width));
         data.extend(bytemuck::bytes_of(&height));
-
-        (0..100).for_each(|_| data.push(0));
+        data.extend(bytemuck::bytes_of(&self.sample_count));
+        data.extend(bytemuck::bytes_of(&self.recursion_depth));
 
         Self::create_buffer(
             Some("Pixels buffer"),
             device,
             bytemuck::cast_slice(data.as_slice()),
-            wgpu::BufferUsages::STORAGE
+            wgpu::BufferUsages::UNIFORM
                 | wgpu::BufferUsages::COPY_DST
                 | wgpu::BufferUsages::COPY_SRC,
         )

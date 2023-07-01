@@ -68,8 +68,16 @@ impl Scene {
             .collect_vec()
     }
 
-    pub fn gpu_material_data(&self) -> Vec<Material> {
-        todo!()
+    pub fn gpu_material_data(&self) -> Vec<[f32; 8]> {
+        self.triangle_mesh
+            .materials()
+            .iter()
+            .map(|mat| {
+                let d = mat.diffuse_color;
+                let e = mat.emissive_color;
+                [d.x, d.y, d.z, 0f32, e.x, e.y, e.z, 0f32]
+            })
+            .collect_vec()
     }
 }
 

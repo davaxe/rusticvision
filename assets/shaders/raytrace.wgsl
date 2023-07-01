@@ -1,5 +1,6 @@
 struct Material {
-    diffuse_color: vec3<f32>
+    diffuse_color: vec4<f32>,
+    emissive_color: vec4<f32>
     // TODO: add more properties
 }
 
@@ -33,9 +34,9 @@ struct Camera {
     inverse_view: mat4x4<f32>,
     width: u32,
     height: u32,
-    temp: array<u32>
+    samples_per_pixel: u32,
+    max_bounces: u32,
 }
-
 
 // Data buffers for the scene, loaded from CPU
 @group(0)
@@ -45,10 +46,6 @@ var<storage, read> vertex_positions: array<vec4<f32>>;
 @group(0)
 @binding(1)
 var<storage, read> vertex_normals: array<vec4<f32>>;
-
-// @group(0)
-// @binding(2)
-// var<storage, read> materials: array<Material>;
 
 @group(0)
 @binding(2)
@@ -66,32 +63,35 @@ var<storage, read> objects_data: ObjectData;
 @binding(5)
 var<storage, read_write> pixels: array<vec4<f32>>;
 
-
-// @group(0)
-// @binding(7)
-// var<storage, read> random_numbers: array<f32>;
-
-// Camera data, loaded from CPU
 @group(0)
 @binding(6)
-var<storage, read> camera: Camera;
+var<storage, read> materials: array<Material>;
 
 @group(0)
 @binding(7)
 var<storage, read> start_rng_state: array<u32>;
 
+// Camera data, loaded from CPU
+@group(0)
+@binding(8)
+var<uniform> camera: Camera;
+
 // Structs used in compute shader
 struct Ray {
     origin: vec3<f32>,
-    direction: vec3<f32>
+    direction: vec3<f32>,
 }
 
 struct Hit {
     hit: bool,
     distance: f32,
+    hit_point: vec3<f32>,
     triangle_index: TriangleIndex,
 }
 
+fn default_hit() -> Hit {
+    return Hit(false, 0.0, vec3<f32>(0.0, 0.0, 0.0), TriangleIndex());
+}
 
 /// Update state after generating a random value with any of the random functions below.
 fn next_random_state(state: u32) -> u32 {
@@ -153,7 +153,7 @@ fn intersect_ray_triangle(ray: Ray, triangle_index: TriangleIndex, t_min: f32, t
     var a: f32 = dot(edge0, h);
 
     if abs(a) < 0.00001 {
-        return Hit(false, 0.0, triangle_index);
+        return default_hit();
     }
 
     var f: f32 = 1.0 / a;
@@ -161,32 +161,31 @@ fn intersect_ray_triangle(ray: Ray, triangle_index: TriangleIndex, t_min: f32, t
     var u: f32 = f * dot(s, h);
 
     if (u < 0.0 || u > 1.0) {
-        return Hit(false, 0.0, triangle_index);
+        return default_hit();
     }
 
     var q: vec3<f32> = cross(s, edge0);
     var v: f32 = f * dot(ray.direction, q);
 
     if (v < 0.0 || u + v > 1.0) {
-        return Hit(false, 0.0, triangle_index);
+        return default_hit();
     }
 
     var t: f32 = f * dot(edge1, q);
 
     if (t < t_min || t > t_max) {
-        return Hit(false, 0.0, triangle_index);
+        return default_hit();
     }
 
-    return Hit(true, t, triangle_index);
+    return Hit(true, t, ray.origin + ray.direction * t, triangle_index);
 }
 
 fn intersect_ray_object(ray: Ray, object: Object, t_min: f32, t_max: f32) -> Hit {
     var aabb: AABB = aabbs[object.aabb_index];
     if !intersect_ray_aabb(ray, aabb, t_min, t_max) {
-        return Hit(false, 0.0, TriangleIndex(0u, 0u, 0u, 0u, 0u));
+        return default_hit();
     }
-
-    var closest_hit: Hit = Hit(false, 0.0, TriangleIndex(0u, 0u, 0u, 0u, 0u));
+    var closest_hit: Hit = default_hit();
     var closest_distance: f32 = t_max;
 
     for (var i: u32 = 0u; i < object.triangles_count; i = i + 1u) {
@@ -201,7 +200,7 @@ fn intersect_ray_object(ray: Ray, object: Object, t_min: f32, t_max: f32) -> Hit
 }
 
 fn intersect(ray: Ray, start_rng_state: u32) -> Hit {
-    var closest_hit: Hit = Hit(false, 0.0, TriangleIndex(0u, 0u, 0u, 0u, 0u));
+    var closest_hit: Hit = default_hit();
     var closest_distance: f32 = 1000000.0;
 
     for (var i: u32 = 0u; i < objects_data.count; i = i + 1u) {
@@ -215,33 +214,69 @@ fn intersect(ray: Ray, start_rng_state: u32) -> Hit {
     return closest_hit;
 }
 
-fn get_ray(x: u32, y: u32) -> Ray {
-    // Normalize pixel coordinates to [-1, 1]
-    var x: f32 = f32(x) / f32(camera.width);
-    var y: f32 = f32(y) / f32(camera.height);
+fn get_ray_normalized_input(x: f32, y: f32) -> Ray {
     var coord: vec2<f32> = vec2<f32>(x, y);
     coord = coord * 2.0 - 1.0;
     var t: vec4<f32> = camera.inverse_projection * vec4<f32>(coord, 0.0, 1.0);
     var a: vec3<f32> = normalize(t.xyz / t.w);
     let ray_dir: vec4<f32> = camera.inverse_view * vec4<f32>(a, 0.0);
-
     return Ray(camera.position.xyz, ray_dir.xyz);
 }
 
+fn get_ray(x: u32, y: u32) -> Ray {
+    // Normalize pixel coordinates to [-1, 1]
+    var x: f32 = f32(x) / f32(camera.width);
+    var y: f32 = f32(y) / f32(camera.height);
+    return get_ray_normalized_input(x, y);
+}
+
+// Update random state after each use.
+fn get_ray_jittered(x: u32, y: u32, random_state: u32) -> Ray {
+    var x_jitter: f32 = f32(x) + clamp(random_value_normal_distribution(random_state), -0.5, 0.5);
+    var random_state = next_random_state(random_state);
+    var y_jitter: f32 = f32(y) + clamp(random_value_normal_distribution(random_state), -0.5, 0.5);
+    x_jitter = x_jitter / f32(camera.width);
+    y_jitter = y_jitter / f32(camera.height);
+    return get_ray_normalized_input(x_jitter, y_jitter);
+}
+
 fn trace(ray: Ray, rng_state: u32) -> vec3<f32> {
-    var hit: Hit = intersect(ray, rng_state);
-    if (!hit.hit) {
-        return vec3<f32>(0.0, 0.0, 0.0);
+
+    var color: vec3<f32> = vec3<f32>(1.0, 1.0, 1.0);
+    var light: vec3<f32> = vec3<f32>(0.0, 0.0, 0.0);
+    var ray = ray;
+    var rng_state = rng_state;
+
+    for (var bounce_count: u32 = 0u; bounce_count <= camera.max_bounces; bounce_count = bounce_count + 1u) {
+        var hit: Hit = intersect(ray, rng_state);
+        rng_state = next_random_state(rng_state);
+        if (!hit.hit) {
+            break;
+        }
+        var triangle_index: TriangleIndex = hit.triangle_index;
+        var material: Material = materials[triangle_index.material];
+        var normal: vec3<f32> = vertex_normals[triangle_index.normal].xyz;
+        ray.direction = normalize(normal + random_direction(rng_state));
+        rng_state = next_random_state(rng_state);
+
+        ray.origin = hit.hit_point + ray.direction * 0.001;
+
+        var emmision: vec3<f32> = material.emissive_color.xyz * 4.5; // TODO: Remvoe scaling by 4.5
+        light += emmision * color;
+        color *= material.diffuse_color.xyz;
     }
-    var normal: vec3<f32> = vertex_normals[hit.triangle_index.normal].xyz;
-    var color: vec3<f32> = normal;
-    return color;
+    return light;
 }
 
 fn color(x: u32, y: u32, rng_state: u32) -> vec3<f32> {
-    var ray: Ray = get_ray(x, y);
-    let color: vec3<f32> = trace(ray, rng_state);
-    return color;
+    var rng_state = rng_state;
+    var color = vec3<f32>(0.0, 0.0, 0.0);
+    for (var i: u32 = 0u; i < camera.samples_per_pixel; i = i + 1u) {
+        var ray: Ray = get_ray_jittered(x, y, rng_state);
+        color += trace(ray, rng_state);
+        rng_state = next_random_state(rng_state);
+    }
+    return color / f32(camera.samples_per_pixel);
 }
 
 fn get_pixel_coord(index: u32) -> vec2<u32> {
@@ -251,8 +286,9 @@ fn get_pixel_coord(index: u32) -> vec2<u32> {
 }
 
 @compute
-@workgroup_size(144)
+@workgroup_size(145)
 fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
+    var normal: vec3<f32> = vertex_normals[global_id.x].xyz; // Temp to use
     var coord = get_pixel_coord(global_id.x);
     var rng_state = start_rng_state[global_id.x];
     var color = color(coord.x, coord.y, rng_state);

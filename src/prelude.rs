@@ -168,7 +168,9 @@ impl RayTracer {
         let (objects, mesh) = parser::get_objects(mesh, &obj_map, &mat_map);
 
         let scene = Scene::new(mesh, objects);
-        let renderer = GPUSceneRenderer::new(camera, &scene);
+        let mut renderer = GPUSceneRenderer::new(camera, &scene);
+        renderer.set_sample_count(self.sample_count.unwrap_or(1));
+        renderer.set_recursion_depth(self.recursion_depth.unwrap_or(1));
         let a = pollster::block_on(renderer.render()).unwrap();
 
         let (width, height) = camera.get_dimensions();
