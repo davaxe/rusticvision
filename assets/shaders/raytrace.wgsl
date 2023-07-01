@@ -1,7 +1,11 @@
 struct Material {
-    diffuse_color: vec4<f32>,
-    emissive_color: vec4<f32>
-    // TODO: add more properties
+    ambient_color: vec3<f32>,
+    diffuse_color: vec3<f32>,
+    specular_color: vec3<f32>,
+    emissive_color: vec3<f32>,
+    specular_highlight: f32,
+    index_of_refraction: f32,
+    transparency: f32,
 }
 
 struct TriangleIndex {
@@ -13,8 +17,8 @@ struct TriangleIndex {
 }
 
 struct AABB {
-    min: vec4<f32>,
-    max: vec4<f32>
+    min: vec3<f32>,
+    max: vec3<f32>
 }
 
 struct Object {
@@ -29,9 +33,12 @@ struct ObjectData {
 }
 
 struct Camera {
-    position: vec4<f32>,
     inverse_projection: mat4x4<f32>,
     inverse_view: mat4x4<f32>,
+    position: vec3<f32>,
+}
+
+struct RenderOptions {
     width: u32,
     height: u32,
     samples_per_pixel: u32,
@@ -41,11 +48,11 @@ struct Camera {
 // Data buffers for the scene, loaded from CPU
 @group(0)
 @binding(0)
-var<storage, read> vertex_positions: array<vec4<f32>>;
+var<storage, read> vertex_positions: array<vec3<f32>>;
 
 @group(0)
 @binding(1)
-var<storage, read> vertex_normals: array<vec4<f32>>;
+var<storage, read> vertex_normals: array<vec3<f32>>;
 
 @group(0)
 @binding(2)
@@ -75,6 +82,10 @@ var<storage, read> start_rng_state: array<u32>;
 @group(0)
 @binding(8)
 var<uniform> camera: Camera;
+
+@group(0)
+@binding(9)
+var<uniform> render_options: RenderOptions;
 
 // Structs used in compute shader
 struct Ray {
@@ -220,13 +231,13 @@ fn get_ray_normalized_input(x: f32, y: f32) -> Ray {
     var t: vec4<f32> = camera.inverse_projection * vec4<f32>(coord, 0.0, 1.0);
     var a: vec3<f32> = normalize(t.xyz / t.w);
     let ray_dir: vec4<f32> = camera.inverse_view * vec4<f32>(a, 0.0);
-    return Ray(camera.position.xyz, ray_dir.xyz);
+    return Ray(camera.position, ray_dir.xyz);
 }
 
 fn get_ray(x: u32, y: u32) -> Ray {
     // Normalize pixel coordinates to [-1, 1]
-    var x: f32 = f32(x) / f32(camera.width);
-    var y: f32 = f32(y) / f32(camera.height);
+    var x: f32 = f32(x) / f32(render_options.width);
+    var y: f32 = f32(y) / f32(render_options.height);
     return get_ray_normalized_input(x, y);
 }
 
@@ -235,8 +246,8 @@ fn get_ray_jittered(x: u32, y: u32, random_state: u32) -> Ray {
     var x_jitter: f32 = f32(x) + clamp(random_value_normal_distribution(random_state), -0.5, 0.5);
     var random_state = next_random_state(random_state);
     var y_jitter: f32 = f32(y) + clamp(random_value_normal_distribution(random_state), -0.5, 0.5);
-    x_jitter = x_jitter / f32(camera.width);
-    y_jitter = y_jitter / f32(camera.height);
+    x_jitter = x_jitter / f32(render_options.width);
+    y_jitter = y_jitter / f32(render_options.height);
     return get_ray_normalized_input(x_jitter, y_jitter);
 }
 
@@ -247,7 +258,7 @@ fn trace(ray: Ray, rng_state: u32) -> vec3<f32> {
     var ray = ray;
     var rng_state = rng_state;
 
-    for (var bounce_count: u32 = 0u; bounce_count <= camera.max_bounces; bounce_count = bounce_count + 1u) {
+    for (var bounce_count: u32 = 0u; bounce_count <= render_options.max_bounces; bounce_count = bounce_count + 1u) {
         var hit: Hit = intersect(ray, rng_state);
         rng_state = next_random_state(rng_state);
         if (!hit.hit) {
@@ -255,15 +266,15 @@ fn trace(ray: Ray, rng_state: u32) -> vec3<f32> {
         }
         var triangle_index: TriangleIndex = hit.triangle_index;
         var material: Material = materials[triangle_index.material];
-        var normal: vec3<f32> = vertex_normals[triangle_index.normal].xyz;
+        var normal: vec3<f32> = vertex_normals[triangle_index.normal];
         ray.direction = normalize(normal + random_direction(rng_state));
         rng_state = next_random_state(rng_state);
 
         ray.origin = hit.hit_point + ray.direction * 0.001;
 
-        var emmision: vec3<f32> = material.emissive_color.xyz * 4.5; // TODO: Remvoe scaling by 4.5
+        var emmision: vec3<f32> = material.emissive_color * 4.5; // TODO: Remvoe scaling by 4.5
         light += emmision * color;
-        color *= material.diffuse_color.xyz;
+        color *= material.diffuse_color;
     }
     return light;
 }
@@ -271,24 +282,27 @@ fn trace(ray: Ray, rng_state: u32) -> vec3<f32> {
 fn color(x: u32, y: u32, rng_state: u32) -> vec3<f32> {
     var rng_state = rng_state;
     var color = vec3<f32>(0.0, 0.0, 0.0);
-    for (var i: u32 = 0u; i < camera.samples_per_pixel; i = i + 1u) {
+    for (var i: u32 = 0u; i < render_options.samples_per_pixel; i = i + 1u) {
         var ray: Ray = get_ray_jittered(x, y, rng_state);
         color += trace(ray, rng_state);
         rng_state = next_random_state(rng_state);
     }
-    return color / f32(camera.samples_per_pixel);
+    return color / f32(render_options.samples_per_pixel);
 }
 
 fn get_pixel_coord(index: u32) -> vec2<u32> {
-    var x: u32 = index % camera.width;
-    var y: u32 = index / camera.width;
+    var x: u32 = index % render_options.width;
+    var y: u32 = index / render_options.width;
     return vec2<u32>(x, y);
+}
+
+fn vec3_equal(a: vec3<f32>, b: vec3<f32>) -> bool {
+    return a.x == b.x && a.y == b.y && a.z == b.z;
 }
 
 @compute
 @workgroup_size(145)
 fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
-    var normal: vec3<f32> = vertex_normals[global_id.x].xyz; // Temp to use
     var coord = get_pixel_coord(global_id.x);
     var rng_state = start_rng_state[global_id.x];
     var color = color(coord.x, coord.y, rng_state);

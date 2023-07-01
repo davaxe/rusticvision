@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Arc};
+use std::collections::HashMap;
 
 use nom::{
     branch::alt,
@@ -8,22 +8,25 @@ use nom::{
     sequence::preceded,
     IResult,
 };
+use rayon::prelude::{IntoParallelRefIterator, IntoParallelIterator};
 
-use crate::{primitives::TriangleMesh, scene::object::Object};
+use crate::data_structures::*;
 
-mod face_parser;
+use vertex_parser::VertexData;
+
 mod material_parser;
+mod triangle_parser;
 mod vertex_parser;
 
 struct ObjParts {
-    // A string containing the vertex data (positions, normals, textures
-    // coordinates)
+    /// A string containing the vertex data (positions, normals, textures
+    /// coordinates)
     pub vertex_data: String,
 
-    // The name of the material file to be used.
+    /// The name of the material file to be used.
     pub material_file_name: String,
 
-    // Map from object name to the faces of the object (material included)
+    /// Map from object name to the faces of the object (material included)
     pub object_map: HashMap<String, String>,
 }
 
@@ -40,6 +43,14 @@ enum ParseLineResult<'original> {
     Other(&'original str),
 }
 
+pub struct ObjData {
+    pub vertex_data: VertexData,
+    pub material_data: Vec<MaterialData>,
+    pub object_data: Vec<ObjectData>,
+    pub triangle_data: Vec<TriangleData>,
+    pub bounding_boxes: Vec<BoundingBoxData>,
+}
+
 /// Get triangle mesh and an object map from an obj file. The obj file is
 /// expected to be in the triangle format.
 ///
@@ -48,10 +59,9 @@ enum ParseLineResult<'original> {
 /// - `obj_file` - The name of the obj file.
 ///
 /// ### Returns
-/// A tuple containing the triangle mesh, object map and material map. The
-/// object map maps the object name to the faces (string format) that belong to
-/// that object. The material map maps the material name to the index of the
-/// material in the triangle mesh.
+/// All data parsed from the obj file. This includes the vertex data, material
+/// data, object data and triangle data. Also returns vector of bounding boxes
+/// calculated from the vertex data and triangle data.
 ///
 /// ### Panics
 /// The function panics when:
@@ -60,14 +70,7 @@ enum ParseLineResult<'original> {
 /// 3. The material file cannot be read.
 /// 4. The material file cannot be parsed.
 ///
-pub fn get_triangle_mesh_and_obj_map(
-    directory: &str,
-    obj_file: &str,
-) -> (
-    TriangleMesh,
-    HashMap<String, usize>,
-    HashMap<String, String>,
-) {
+pub fn parse_obj(directory: &str, obj_file: &str) -> ObjData {
     let obj_path = format!("{}/{}", directory, obj_file);
     let obj_file = std::fs::read_to_string(obj_path).expect("PARSE_OBJ: Unable to read obj file");
 
@@ -76,49 +79,91 @@ pub fn get_triangle_mesh_and_obj_map(
         extract_parts_obj(&obj_file).expect("PARSE_OBJ: Failed to extract parts from obj file");
 
     // Get vertex data from the vertex data string
-    let (_, (vp, vn, _)) = vertex_parser::parse_vertex_data(&object_parts.vertex_data).unwrap();
+    let (_, vertex_data) = vertex_parser::parse_vertex_data(&object_parts.vertex_data).unwrap();
 
     // Load the materials from the material file.
     let mat_path = format!("{}/{}", directory, object_parts.material_file_name);
     let mat_file = std::fs::read_to_string(mat_path.trim_end())
         .expect("PARSE_OBJ: Unable to read material file");
-    let (_, (materials, material_map)) = material_parser::materials(&mat_file).unwrap();
+    let (_, (material_data, material_map)) = material_parser::materials(&mat_file).unwrap();
 
-    // Create the triangle mesh that stores the vertex data and materials
-    let triangle_mesh = TriangleMesh::new(vp, vn, materials, vec![]);
+    let (object_data, triangle_data) =
+        get_object_and_triangle_data(&object_parts.object_map, &material_map);
 
-    (triangle_mesh, material_map, object_parts.object_map)
+    let bounding_boxes =
+        calculate_bounding_boxes(&vertex_data.positions, &triangle_data, &object_data);
+
+    ObjData {
+        vertex_data,
+        material_data,
+        object_data,
+        triangle_data,
+        bounding_boxes,
+    }
 }
 
-pub fn get_objects(
-    triangle_mesh: TriangleMesh,
+/// Extract object data and triangle data from the object map and material map.
+fn get_object_and_triangle_data(
     object_map: &HashMap<String, String>,
     material_map: &HashMap<String, usize>,
-) -> (Vec<Object>, Arc<TriangleMesh>) {
+) -> (Vec<ObjectData>, Vec<TriangleData>) {
     // Save data for later use, so we can create the objects when we have the
     // triangle full triangle mesh.
-    let mut objects_data: Vec<(String, usize, usize)> = Vec::new();
-    let mut triangle_mesh = triangle_mesh;
-    for (name, faces_str) in object_map {
-        let (_, indices) = face_parser::parse_triangle_indices(faces_str, material_map)
+    let mut objects_data: Vec<ObjectData> = Vec::new();
+    let mut triangle_data: Vec<TriangleData> = Vec::with_capacity(500);
+    for (idx, (_, faces_str)) in object_map.iter().enumerate() {
+        let (_, indices) = triangle_parser::parse_triangles(faces_str, material_map)
             .expect("PARSE: Failed to parse triangle faces");
-        objects_data.push((
-            name.clone(),
-            triangle_mesh.triangle_indices().len(),
-            indices.len(),
-        ));
-        triangle_mesh.extend_triangle_indices(&indices);
+        let object_data =
+            ObjectData::new(idx as u32, triangle_data.len() as u32, indices.len() as u32);
+        objects_data.push(object_data);
+        triangle_data.extend(indices);
     }
-
-    let triangle_mesh = Arc::new(triangle_mesh);
-
-    let objects = objects_data
-        .into_iter()
-        .map(|(name, start, count)| Object::new(name, start, count, Arc::clone(&triangle_mesh)))
-        .collect();
-
-    (objects, triangle_mesh)
+    (objects_data, triangle_data)
 }
+
+/// Calculates bounding boxes for all objects.
+fn calculate_bounding_boxes(
+    vertex_positions: &[Vec3Data],
+    triangles: &[TriangleData],
+    objects: &[ObjectData],
+) -> Vec<BoundingBoxData> {
+    objects
+        .iter()
+        .map(|obj| {
+            let start = obj.triangle_start_index as usize;
+            let end = start + obj.triangle_count as usize;
+            let mut min_pos = [f32::INFINITY; 3];
+            let mut max_pos = [f32::NEG_INFINITY; 3];
+            triangles[start..end].iter().for_each(|triangle| {
+                let (min, max) = extract_min_max_pos(triangle, vertex_positions);
+                for i in 0..3 {
+                    min_pos[i] = min_pos[i].min(min[i]);
+                    max_pos[i] = max_pos[i].max(max[i]);
+                }
+            });
+            BoundingBoxData::new(min_pos, max_pos)
+        })
+        .collect()
+}
+
+fn extract_min_max_pos(
+    triangle_data: &TriangleData,
+    vertex_positions: &[Vec3Data],
+) -> ([f32; 3], [f32; 3]) {
+    let v0 = vertex_positions[triangle_data.v0_index as usize].data;
+    let v1 = vertex_positions[triangle_data.v1_index as usize].data;
+    let v2 = vertex_positions[triangle_data.v2_index as usize].data;
+    let mut min_pos = [f32::INFINITY; 3];
+    let mut max_pos = [f32::NEG_INFINITY; 3];
+    for i in 0..3 {
+        min_pos[i] = min_pos[i].min(v0[i]).min(v1[i]).min(v2[i]);
+        max_pos[i] = max_pos[i].max(v0[i]).max(v1[i]).max(v2[i]);
+    }
+    (min_pos, max_pos)
+}
+
+/*=============================PARSER_RELATED================================*/
 
 /// Parse a line of the input string slice.
 fn line(input: &str) -> IResult<&str, &str> {

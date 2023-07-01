@@ -13,7 +13,7 @@ use nom::{
     IResult,
 };
 
-use crate::primitives::TriangleIndex;
+use crate::data_structures::*;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 enum VertexIndexGroup {
@@ -45,21 +45,20 @@ enum TriangleIndexData<'a> {
 ///
 /// ### Panics
 /// When the input is not of the form specified above.  
-pub fn parse_triangle_indices<'a>(
+pub fn parse_triangles<'a>(
     input: &'a str,
     material_map: &'a HashMap<String, usize>,
-) -> IResult<&'a str, Vec<TriangleIndex>> {
-    use TriangleIndexData::*;
+) -> IResult<&'a str, Vec<TriangleData>> {
     let (input, data) = parse_triangle_index_data(input)?;
-
     let mut triangle_indices = Vec::new();
     let mut current_material_index = 0;
+
     data.into_iter().for_each(|d| match d {
-        MaterialName(name) => {
+        TriangleIndexData::MaterialName(name) => {
             current_material_index = *material_map.get(name).expect("Material not found");
         }
-        Face([v1, v2, v3]) => {
-            let triangle_index = convert_to_triangle_index(&v1, &v2, &v3, current_material_index);
+        TriangleIndexData::Face([v1, v2, v3]) => {
+            let triangle_index = convert_to_triangle(&v1, &v2, &v3, current_material_index);
             triangle_indices.push(triangle_index);
         }
     });
@@ -147,20 +146,20 @@ fn parse_triangle_index_data(input: &str) -> IResult<&str, Vec<TriangleIndexData
 /// ### Panics
 /// Panics if the three vertex index groups are not of the same type or if the
 /// vertex index groups are not valid or supported.
-fn convert_to_triangle_index(
+fn convert_to_triangle(
     v1: &VertexIndexGroup,
     v2: &VertexIndexGroup,
     v3: &VertexIndexGroup,
     material_index: usize,
-) -> TriangleIndex {
+) -> TriangleData {
     use VertexIndexGroup::*;
     let m = material_index;
     match (v1, v2, v3) {
         (PosNormTex(p1, _, n), PosNormTex(p2, _, _), PosNormTex(p3, _, _)) => {
-            TriangleIndex::new((*p1, *p2, *p3), *n, m)
+            TriangleData::new(*p1 as u32, *p2 as u32, *p3 as u32, *n as u32, m as u32)
         }
         (PosNorm(p1, n), PosNorm(p2, _), PosNorm(p3, _)) => {
-            TriangleIndex::new((*p1, *p2, *p3), *n, m)
+            TriangleData::new(*p1 as u32, *p2 as u32, *p3 as u32, *n as u32, m as u32)
         }
         // All other cases are valid but not currently supported.
         _ => panic!("Invalid vertex index group"),
