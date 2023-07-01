@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use crate::data_structures::*;
 use nom::{
     branch::alt,
     bytes::complete::{tag, take_till},
@@ -8,9 +9,6 @@ use nom::{
     sequence::preceded,
     IResult,
 };
-use rayon::prelude::{IntoParallelRefIterator, IntoParallelIterator};
-
-use crate::data_structures::*;
 
 use vertex_parser::VertexData;
 

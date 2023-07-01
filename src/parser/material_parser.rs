@@ -1,4 +1,4 @@
-use std::{collections::HashMap, default};
+use std::{collections::HashMap};
 
 use nom::{
     self,
@@ -34,16 +34,16 @@ pub struct Material {
     pub index_of_refraction: f32,
 }
 
-impl Into<MaterialData> for Material {
-    fn into(self) -> MaterialData {
+impl From<Material> for MaterialData {
+    fn from(val: Material) -> Self {
         MaterialData::new(
-            self.ambient_color,
-            self.diffuse_color,
-            self.specular_color,
-            self.emission_color,
-            self.specular_highlight,
-            self.index_of_refraction,
-            self.transparency,
+            val.ambient_color,
+            val.diffuse_color,
+            val.specular_color,
+            val.emission_color,
+            val.specular_highlight,
+            val.index_of_refraction,
+            val.transparency,
         )
     }
 }

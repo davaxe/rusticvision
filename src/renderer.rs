@@ -1,8 +1,7 @@
 use std::borrow::Cow;
 
-use image::RgbImage;
+use image::{Rgb, RgbImage};
 use itertools::Itertools;
-use nom::ExtendInto;
 use wgpu::util::DeviceExt;
 
 use super::data_structures::*;
@@ -68,22 +67,13 @@ impl Renderer {
         let size = (width as usize * height as usize * 4 * std::mem::size_of::<f32>())
             as wgpu::BufferAddress;
 
+        // Creates a staging buffer to store the data from the GPU
         let staging_buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: None,
             size,
             usage: wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
-
-        let vertex_position_buffer = self.vertex_position_buffer(device);
-        let vertex_normal_buffer = self.vertex_normal_buffer(device);
-        let triangle_index_buffer = self.triangle_index_buffer(device);
-        let (obj_buffer, aabb_buffer) = self.object_buffer(device);
-        let pixel_buffer = self.pixel_buffer(device);
-        let camera_data_buffer = self.camera_data_buffer(device);
-        let random_buffer = self.random_numbers_buffer(device);
-        let material_buffer = self.material_buffer(device);
-        let render_settings_buffer = self.render_settings_buffer(device);
 
         let compute_pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
             label: Some("Compute pipeline"),
@@ -93,52 +83,7 @@ impl Renderer {
         });
 
         let bind_group_layout = compute_pipeline.get_bind_group_layout(0);
-        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: None,
-            layout: &bind_group_layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: vertex_position_buffer.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: vertex_normal_buffer.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 2,
-                    resource: triangle_index_buffer.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 3,
-                    resource: aabb_buffer.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 4,
-                    resource: obj_buffer.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 5,
-                    resource: pixel_buffer.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 6,
-                    resource: material_buffer.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 7,
-                    resource: random_buffer.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 8,
-                    resource: camera_data_buffer.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 9,
-                    resource: render_settings_buffer.as_entire_binding(),
-                },
-            ],
-        });
+        let (bind_group, pixel_buffer) = self.initialize_bind_group(device, &bind_group_layout);
 
         let mut encoder =
             device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
@@ -184,6 +129,65 @@ impl Renderer {
         }
     }
 
+    /// Initialize and return the bind group.Additionally return the pixel
+    /// buffer that will be used to store the data from the GPU to the staging
+    /// buffer.
+    fn initialize_bind_group(
+        &self,
+        device: &wgpu::Device,
+        bind_group_layout: &wgpu::BindGroupLayout,
+    ) -> (wgpu::BindGroup, wgpu::Buffer) {
+        let pixel_buffer = self.pixel_buffer(device);
+        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: None,
+            layout: bind_group_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: self.vertex_position_buffer(device).as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: self.vertex_normal_buffer(device).as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: self.triangle_index_buffer(device).as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 3,
+                    resource: self.aabb_buffer(device).as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 4,
+                    resource: self.object_buffer(device).as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 5,
+                    resource: pixel_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 6,
+                    resource: self.material_buffer(device).as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 7,
+                    resource: self.random_numbers_buffer(device).as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 8,
+                    resource: self.camera_data_buffer(device).as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 9,
+                    resource: self.render_settings_buffer(device).as_entire_binding(),
+                },
+            ],
+        });
+        (bind_group, pixel_buffer)
+    }
+
+    /// Converts the data from the GPU to an image.
     fn to_image(&self, data: Vec<[f32; 4]>) -> RgbImage {
         let (width, height) = self.image_resolution;
         let mut image = RgbImage::new(width, height);
@@ -193,7 +197,7 @@ impl Renderer {
             let r = (r * 255.0) as u8;
             let g = (g * 255.0) as u8;
             let b = (b * 255.0) as u8;
-            image.put_pixel(x, y, image::Rgb([r, g, b]));
+            image.put_pixel(x, y, Rgb([r, g, b]));
         });
         image
     }
@@ -242,44 +246,42 @@ impl Renderer {
         )
     }
 
-    fn object_buffer(&self, device: &wgpu::Device) -> (wgpu::Buffer, wgpu::Buffer) {
-        let count = self.gpu_data.objects.len() as u32;
-        let first = bytemuck::bytes_of(&count);
-        let second = self.gpu_data.to_bytes().objects;
-        let object_data = [first, second].concat();
-
-        let object_buffer = Self::create_buffer(
-            Some("Object buffer"),
-            device,
-            object_data.as_slice(),
-            wgpu::BufferUsages::STORAGE
-                | wgpu::BufferUsages::COPY_DST
-                | wgpu::BufferUsages::COPY_SRC,
-        );
-
-        let aabb_buffer = Self::create_buffer(
+    fn aabb_buffer(&self, device: &wgpu::Device) -> wgpu::Buffer {
+        Self::create_buffer(
             Some("AABB buffer"),
             device,
             self.gpu_data.to_bytes().bounding_boxes,
             wgpu::BufferUsages::STORAGE
                 | wgpu::BufferUsages::COPY_DST
                 | wgpu::BufferUsages::COPY_SRC,
-        );
+        )
+    }
 
-        (object_buffer, aabb_buffer)
+    fn object_buffer(&self, device: &wgpu::Device) -> wgpu::Buffer {
+        // Add the number of objects to the start of the buffer.
+        let count = self.gpu_data.objects.len() as u32;
+        let first = bytemuck::bytes_of(&count);
+        let second = self.gpu_data.to_bytes().objects;
+        let object_data = [first, second].concat();
+
+        Self::create_buffer(
+            Some("Object buffer"),
+            device,
+            object_data.as_slice(),
+            wgpu::BufferUsages::STORAGE
+                | wgpu::BufferUsages::COPY_DST
+                | wgpu::BufferUsages::COPY_SRC,
+        )
     }
 
     fn pixel_buffer(&self, device: &wgpu::Device) -> wgpu::Buffer {
-        let (x, y) = self.image_resolution;
-        let pixels = (0..x)
-            .cartesian_product(0..y)
-            .flat_map(|_| [1f32, 1f32, 1f32, 1f32])
-            .collect_vec();
-
+        // 16 bytes per pixel (4 floats)
+        let size = (self.image_resolution.0 * self.image_resolution.1 * 16) as usize;
+        let data = vec![0u8; size];
         Self::create_buffer(
             Some("Pixels buffer"),
             device,
-            bytemuck::cast_slice(pixels.as_slice()),
+            bytemuck::cast_slice(data.as_slice()),
             wgpu::BufferUsages::STORAGE
                 | wgpu::BufferUsages::COPY_DST
                 | wgpu::BufferUsages::COPY_SRC,

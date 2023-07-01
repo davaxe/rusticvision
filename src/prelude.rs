@@ -1,4 +1,4 @@
-use image::{Rgb, RgbImage};
+use image::RgbImage;
 
 use crate::{data_structures::*, parser::parse_obj, renderer::Renderer};
 
@@ -54,14 +54,14 @@ impl RayTracer {
         self
     }
 
-    /// Sets the resolution of the image to be rendered.
+    /// Sets the resolution of the image to be rendered. Defaults to (800, 600).
     #[inline]
     pub fn resolution(mut self, width: u32, height: u32) -> Self {
         self.image_resolution = Some((width, height));
         self
     }
 
-    /// Sets camera position.
+    /// Sets camera position. Defaults to (0, 1, 0).
     #[inline]
     pub fn camera_position(mut self, x: f32, y: f32, z: f32) -> Self {
         self.camera_builder = self.camera_builder.with_position(x, y, z);
@@ -76,14 +76,29 @@ impl RayTracer {
         self
     }
 
-    /// Sets the number of samples to take per pixel.
+    /// Sets the camera's vertical field of view in degrees. Defaults to 39.6,
+    /// which is the default blender value.
+    #[inline]
+    pub fn camera_vertical_fov(mut self, fov: f32) -> Self {
+        self.camera_builder = self.camera_builder.with_vertical_fov(fov);
+        self
+    }
+
+    /// Set the camera's clipping planes. Defaults to (0.1, 1000.0).
+    #[inline]
+    pub fn camera_clipping(mut self, near: f32, far: f32) -> Self {
+        self.camera_builder = self.camera_builder.with_z_far(far).with_z_near(near);
+        self
+    }
+
+    /// Sets the number of samples to take per pixel. Defaults to 1.
     #[inline]
     pub fn sample_count(mut self, sample_count: u32) -> Self {
         self.sample_count = Some(sample_count);
         self
     }
 
-    /// Sets the recursion depth for the ray tracing.
+    /// Sets the recursion depth for the ray tracing. Defaults to 1.
     #[inline]
     pub fn recursion_depth(mut self, recursion_depth: u32) -> Self {
         self.recursion_depth = Some(recursion_depth);
@@ -105,6 +120,7 @@ impl RayTracer {
 
         let obj_data = parse_obj(directory, obj_file);
 
+        // Get the image resolution, sample count, and recursion depth
         let (width, height) = self.image_resolution.unwrap_or((800, 600));
         let samples = self.sample_count.unwrap_or(1);
         let bounces = self.recursion_depth.unwrap_or(1);
@@ -142,6 +158,7 @@ impl Default for RayTracer {
     }
 }
 
+/// Private struct for easily building a camera.
 #[derive(Clone, Debug)]
 struct CameraBuilder {
     position: Option<[f32; 3]>,
@@ -204,7 +221,7 @@ impl CameraBuilder {
         let vertical_fov = self.vertical_fov.unwrap_or(39.6); // blender default
         let aspect_ratio = image_size.0 as f32 / image_size.1 as f32;
         let z_near = self.z_near.unwrap_or(0.1);
-        let z_far = self.z_far.unwrap_or(100.0);
+        let z_far = self.z_far.unwrap_or(1000.0);
         let position = self.position.unwrap_or([0.0, 1.0, 0.0]);
         let target = self.target.unwrap_or([0.0, 0.0, 0.0]);
 
