@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use image::{Rgb, RgbImage};
+use image::{EncodableLayout, Rgb, RgbImage};
 use itertools::Itertools;
 use wgpu::util::DeviceExt;
 
@@ -156,30 +156,26 @@ impl Renderer {
                 },
                 wgpu::BindGroupEntry {
                     binding: 3,
-                    resource: self.aabb_buffer(device).as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 4,
                     resource: self.object_buffer(device).as_entire_binding(),
                 },
                 wgpu::BindGroupEntry {
-                    binding: 5,
+                    binding: 4,
                     resource: pixel_buffer.as_entire_binding(),
                 },
                 wgpu::BindGroupEntry {
-                    binding: 6,
+                    binding: 5,
                     resource: self.material_buffer(device).as_entire_binding(),
                 },
                 wgpu::BindGroupEntry {
-                    binding: 7,
+                    binding: 6,
                     resource: self.random_numbers_buffer(device).as_entire_binding(),
                 },
                 wgpu::BindGroupEntry {
-                    binding: 8,
+                    binding: 7,
                     resource: self.camera_data_buffer(device).as_entire_binding(),
                 },
                 wgpu::BindGroupEntry {
-                    binding: 9,
+                    binding: 8,
                     resource: self.render_settings_buffer(device).as_entire_binding(),
                 },
             ],
@@ -246,23 +242,14 @@ impl Renderer {
         )
     }
 
-    fn aabb_buffer(&self, device: &wgpu::Device) -> wgpu::Buffer {
-        Self::create_buffer(
-            Some("AABB buffer"),
-            device,
-            self.gpu_data.to_bytes().bounding_boxes,
-            wgpu::BufferUsages::STORAGE
-                | wgpu::BufferUsages::COPY_DST
-                | wgpu::BufferUsages::COPY_SRC,
-        )
-    }
-
     fn object_buffer(&self, device: &wgpu::Device) -> wgpu::Buffer {
-        // Add the number of objects to the start of the buffer.
+        // Add the number of objects to the start of the buffer. Also add 3
+        // empty u32s to make the array of objects 16 byte aligned.
         let count = self.gpu_data.objects.len() as u32;
-        let first = bytemuck::bytes_of(&count);
+        let initial: [u32; 4] = [count, 0, 0, 0];
+        let initial = bytemuck::bytes_of(&initial);
         let second = self.gpu_data.to_bytes().objects;
-        let object_data = [first, second].concat();
+        let object_data = [initial, second].concat();
 
         Self::create_buffer(
             Some("Object buffer"),

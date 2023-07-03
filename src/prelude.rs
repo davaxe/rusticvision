@@ -127,7 +127,6 @@ impl RayTracer {
 
         // Create GPU data and load it with the obj data
         let mut gpu_data = GPUData::new();
-        gpu_data.set_bounding_boxes(obj_data.bounding_boxes);
         gpu_data.set_triangles(obj_data.triangle_data);
         gpu_data.set_materials(obj_data.material_data);
         gpu_data.set_vertex_positions(obj_data.vertex_data.positions);

@@ -46,7 +46,6 @@ pub struct ObjData {
     pub material_data: Vec<MaterialData>,
     pub object_data: Vec<ObjectData>,
     pub triangle_data: Vec<TriangleData>,
-    pub bounding_boxes: Vec<BoundingBoxData>,
 }
 
 /// Get triangle mesh and an object map from an obj file. The obj file is
@@ -88,7 +87,7 @@ pub fn parse_obj(directory: &str, obj_file: &str) -> ObjData {
     let (object_data, triangle_data) =
         get_object_and_triangle_data(&object_parts.object_map, &material_map);
 
-    let bounding_boxes =
+    let object_data =
         calculate_bounding_boxes(&vertex_data.positions, &triangle_data, &object_data);
 
     ObjData {
@@ -96,7 +95,6 @@ pub fn parse_obj(directory: &str, obj_file: &str) -> ObjData {
         material_data,
         object_data,
         triangle_data,
-        bounding_boxes,
     }
 }
 
@@ -108,12 +106,12 @@ fn get_object_and_triangle_data(
     // Save data for later use, so we can create the objects when we have the
     // triangle full triangle mesh.
     let mut objects_data: Vec<ObjectData> = Vec::new();
-    let mut triangle_data: Vec<TriangleData> = Vec::with_capacity(500);
-    for (idx, (_, faces_str)) in object_map.iter().enumerate() {
+    let mut triangle_data: Vec<TriangleData> = Vec::new();
+    for (_, (_, faces_str)) in object_map.iter().enumerate() {
         let (_, indices) = triangle_parser::parse_triangles(faces_str, material_map)
             .expect("PARSE: Failed to parse triangle faces");
         let object_data =
-            ObjectData::new(idx as u32, triangle_data.len() as u32, indices.len() as u32);
+            ObjectData::without_bounding_box(triangle_data.len() as u32, indices.len() as u32);
         objects_data.push(object_data);
         triangle_data.extend(indices);
     }
@@ -125,7 +123,7 @@ fn calculate_bounding_boxes(
     vertex_positions: &[Vec3Data],
     triangles: &[TriangleData],
     objects: &[ObjectData],
-) -> Vec<BoundingBoxData> {
+) -> Vec<ObjectData> {
     objects
         .iter()
         .map(|obj| {
@@ -140,7 +138,12 @@ fn calculate_bounding_boxes(
                     max_pos[i] = max_pos[i].max(max[i]);
                 }
             });
-            BoundingBoxData::new(min_pos, max_pos)
+            ObjectData::new(
+                min_pos,
+                max_pos,
+                obj.triangle_start_index,
+                obj.triangle_count,
+            )
         })
         .collect()
 }

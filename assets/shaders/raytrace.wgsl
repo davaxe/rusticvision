@@ -16,13 +16,9 @@ struct TriangleIndex {
     material: u32
 }
 
-struct AABB {
-    min: vec3<f32>,
-    max: vec3<f32>
-}
-
 struct Object {
-    aabb_index: u32,
+    aabb_min: vec3<f32>,
+    aabb_max: vec3<f32>,
     triangles_start: u32,
     triangles_count: u32
 }
@@ -60,31 +56,27 @@ var<storage, read> triangle_indices: array<TriangleIndex>;
 
 @group(0)
 @binding(3)
-var<storage, read> aabbs: array<AABB>;
-
-@group(0)
-@binding(4)
 var<storage, read> objects_data: ObjectData;
 
 @group(0)
-@binding(5)
+@binding(4)
 var<storage, read_write> pixels: array<vec4<f32>>;
 
 @group(0)
-@binding(6)
+@binding(5)
 var<storage, read> materials: array<Material>;
 
 @group(0)
-@binding(7)
+@binding(6)
 var<storage, read> start_rng_state: array<u32>;
 
 // Camera data, loaded from CPU
 @group(0)
-@binding(8)
+@binding(7)
 var<uniform> camera: Camera;
 
 @group(0)
-@binding(9)
+@binding(8)
 var<uniform> render_options: RenderOptions;
 
 // Structs used in compute shader
@@ -140,10 +132,10 @@ fn min_element(v: vec3<f32>) -> f32 {
     return min(v.x, min(v.y, v.z));
 }
 
-fn intersect_ray_aabb(ray: Ray, aabb: AABB, t_min: f32, t_max: f32) -> bool {
+fn intersect_ray_aabb(ray: Ray, aabb_min: vec3<f32>, aabb_max: vec3<f32>, t_min: f32, t_max: f32) -> bool {
     var inv_dir: vec3<f32> = 1.0 / ray.direction;
-    var t0: vec3<f32> = (aabb.min.xyz - ray.origin.xyz) * inv_dir;
-    var t1: vec3<f32> = (aabb.max.xyz - ray.origin.xyz) * inv_dir;
+    var t0: vec3<f32> = (aabb_min - ray.origin) * inv_dir;
+    var t1: vec3<f32> = (aabb_max - ray.origin) * inv_dir;
 
     var t_small: vec3<f32> = min(t0, t1);
     var t_big: vec3<f32> = max(t0, t1);
@@ -192,8 +184,7 @@ fn intersect_ray_triangle(ray: Ray, triangle_index: TriangleIndex, t_min: f32, t
 }
 
 fn intersect_ray_object(ray: Ray, object: Object, t_min: f32, t_max: f32) -> Hit {
-    var aabb: AABB = aabbs[object.aabb_index];
-    if !intersect_ray_aabb(ray, aabb, t_min, t_max) {
+    if !intersect_ray_aabb(ray, object.aabb_min, object.aabb_max, t_min, t_max) {
         return default_hit();
     }
     var closest_hit: Hit = default_hit();
@@ -295,6 +286,7 @@ fn get_pixel_coord(index: u32) -> vec2<u32> {
     var y: u32 = index / render_options.width;
     return vec2<u32>(x, y);
 }
+
 
 fn vec3_equal(a: vec3<f32>, b: vec3<f32>) -> bool {
     return a.x == b.x && a.y == b.y && a.z == b.z;

@@ -1,33 +1,3 @@
-/// Data defining a AABB bounding box. Contains the minimum and maximum points
-/// of the bounding box, and extra padding to match data alignment with the
-/// GPU.
-///
-/// **Data info GPU:**
-/// - size: 32 bytes (8 bytes padding)
-/// - alignment: 16 bytes
-#[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
-#[repr(C)]
-pub struct BoundingBoxData {
-    /// The minimum point of the bounding box.
-    pub min: [f32; 3],
-    _padding0: u32,
-    /// The maximum point of the bounding box.
-    pub max: [f32; 3],
-    _padding1: u32,
-}
-
-impl BoundingBoxData {
-    /// Creates a new bounding box data.
-    pub fn new(min: [f32; 3], max: [f32; 3]) -> Self {
-        Self {
-            min,
-            max,
-            _padding0: 0,
-            _padding1: 0,
-        }
-    }
-}
-
 /// Data defining a vector of three floats (f32). Contains the position of the
 /// vertex.
 ///
@@ -90,28 +60,43 @@ impl TriangleData {
 }
 
 /// Data defining an object of multiple triangles and a bounding box. Contains
-/// the index to the bounding box, the index to the first triangle and the
+/// the bounding box min and max positions, the index to the first triangle and the
 /// number of triangles.
 ///
 /// **Data info GPU:**
-/// - size: 12 bytes (no padding)
-/// - alignment: 4 bytes
+/// - size: 48 bytes (16 bytes padding)
+/// - alignment: 16 bytes
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 #[repr(C)]
 pub struct ObjectData {
-    pub bounding_box_index: u32,
+    pub aabb_min: [f32; 3],
+    _padding0: u32,
+    pub aabb_max: [f32; 3],
     pub triangle_start_index: u32,
     pub triangle_count: u32,
+    _padding1: [u32; 3],
 }
 
 impl ObjectData {
     /// Creates a new object data.
-    pub fn new(bounding_box_index: u32, triangle_start_index: u32, triangle_count: u32) -> Self {
+    pub fn new(
+        aabb_min: [f32; 3],
+        aabb_max: [f32; 3],
+        triangle_start_index: u32,
+        triangle_count: u32,
+    ) -> Self {
         Self {
-            bounding_box_index,
+            aabb_min,
+            _padding0: 0,
+            aabb_max,
             triangle_start_index,
             triangle_count,
+            _padding1: [0; 3],
         }
+    }
+
+    pub fn without_bounding_box(triangle_start_index: u32, triangle_count: u32) -> Self {
+        Self::new([0.0; 3], [0.0; 3], triangle_start_index, triangle_count)
     }
 }
 
@@ -219,7 +204,6 @@ impl RenderData {
 pub struct GPUBytes<'data> {
     pub vertex_positions: &'data [u8],
     pub vertex_normals: &'data [u8],
-    pub bounding_boxes: &'data [u8],
     pub triangles: &'data [u8],
     pub objects: &'data [u8],
     pub materials: &'data [u8],
@@ -231,7 +215,6 @@ pub struct GPUBytes<'data> {
 pub struct GPUData {
     pub vertex_positions: Vec<Vec3Data>,
     pub vertex_normals: Vec<Vec3Data>,
-    pub bounding_boxes: Vec<BoundingBoxData>,
     pub triangles: Vec<TriangleData>,
     pub objects: Vec<ObjectData>,
     pub materials: Vec<MaterialData>,
@@ -246,7 +229,6 @@ impl GPUData {
         Self {
             vertex_positions: Vec::new(),
             vertex_normals: Vec::new(),
-            bounding_boxes: Vec::new(),
             triangles: Vec::new(),
             objects: Vec::new(),
             materials: Vec::new(),
@@ -279,12 +261,6 @@ impl GPUData {
         self.vertex_normals = vertex_normals;
     }
 
-    /// Sets the bounding boxes.
-    #[inline]
-    pub fn set_bounding_boxes(&mut self, bounding_boxes: Vec<BoundingBoxData>) {
-        self.bounding_boxes = bounding_boxes;
-    }
-
     /// Sets the triangles.
     #[inline]
     pub fn set_triangles(&mut self, triangles: Vec<TriangleData>) {
@@ -308,7 +284,6 @@ impl GPUData {
     #[inline]
     pub fn to_bytes(&self) -> GPUBytes {
         GPUBytes {
-            bounding_boxes: bytemuck::cast_slice(&self.bounding_boxes),
             vertex_normals: bytemuck::cast_slice(&self.vertex_normals),
             vertex_positions: bytemuck::cast_slice(&self.vertex_positions),
             triangles: bytemuck::cast_slice(&self.triangles),
